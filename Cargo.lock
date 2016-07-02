@@ -1,0 +1,4 @@
+[root]
+name = "rust-gb-emu"
+version = "0.0.1"
+
