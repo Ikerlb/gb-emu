@@ -9,8 +9,8 @@ pub struct GameBoy{
 
 impl GameBoy{
 
-	pub fn new(ct_rom: Box<[u8]>)->Self{
-		GameBoy{cpu: Cpu::new(),interconnect: Interconnect::new(ct_rom)}
+	pub fn new(cart:Vec<u8>)->Self{
+		GameBoy{cpu: Cpu::new(),interconnect: Interconnect::new(cart)}
 	}
 
     pub fn cpu(&self) -> &Cpu {
@@ -21,7 +21,15 @@ impl GameBoy{
         &self.interconnect
     }
 
+    pub fn run(&mut self){
+        loop{
+            self.cpu.execute_next_opcode(&mut self.interconnect);
+            println!("{}",self);
+        }
+    }
+
 }
+
 
 //Implementing display trait for debugging purposes.
 impl Display for GameBoy {
