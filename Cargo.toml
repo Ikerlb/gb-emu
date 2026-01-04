@@ -2,8 +2,9 @@
 name = "rust-gb-emu"
 version = "0.0.1"
 authors = ["iker <ikerlb95@ciencias.unam.mx>"]
-license = "MIT/Apache-2.0"
+license = "MIT OR Apache-2.0"
+edition = "2021"
 
 [dependencies]
-enum_primitive = "*"
-num = "0.1.30"
+num-traits = "0.2"
+num-derive = "0.4"

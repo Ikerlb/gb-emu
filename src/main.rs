@@ -1,9 +1,3 @@
-#[macro_use]
-extern crate enum_primitive;
-
-#[macro_use]
-extern crate num;
-
 mod gb;
 
 use gb::gameboy::*;
