@@ -11,13 +11,13 @@ impl Register{
 
 	//new register initialized with num.
 	pub fn new(num: u16) -> Self{
-		Register{hi:num as u8,lo: (num>>8) as u8}
+		Register{hi: (num>>8) as u8, lo: num as u8}
 	}
 
 	//set a value to a pair of registers.
 	pub fn set(&mut self,num: u16){
-		self.lo=num as u8;
 		self.hi=(num>>8) as u8;
+		self.lo=num as u8;
 	}
 
 	//get the value of the registers as a pair. 

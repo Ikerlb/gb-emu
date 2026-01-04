@@ -1,7 +1,7 @@
-use gb::interconnect::*;
-use gb::opcode::Opcode;
-use num::FromPrimitive;
-use gb::register::Register;
+use crate::gb::interconnect::*;
+use crate::gb::opcode::Opcode;
+use num_traits::FromPrimitive;
+use crate::gb::register::Register;
 
 //FINISH TESTS!!!
 
@@ -185,4 +185,138 @@ impl Cpu{
 	/*fn get_reg_l(&mut self)->u8{
 		self.regs_hl.get_lo()
 	}*/
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::gb::cartridge::Cartridge;
+
+	fn create_test_interconnect() -> Interconnect {
+		// Create a minimal ROM for testing
+		let mut rom = vec![0; 0x8000];
+		// Add some test data
+		rom[0x0100] = 0x00; // NOP
+		Interconnect::new(rom)
+	}
+
+	#[test]
+	fn test_cpu_initialization() {
+		let cpu = Cpu::new();
+		// Test initial register values match Game Boy hardware
+		assert_eq!(cpu.reg_pc, 0x0100);
+		assert_eq!(cpu.reg_sp.get(), 0xFFFE);
+		assert_eq!(cpu.regs_af.get(), 0x01B0);
+		assert_eq!(cpu.regs_bc.get(), 0x0013);
+		assert_eq!(cpu.regs_de.get(), 0x00D8);
+		assert_eq!(cpu.regs_hl.get(), 0x014D);
+	}
+
+	#[test]
+	fn test_nop_opcode() {
+		let mut cpu = Cpu::new();
+		let mut inter = create_test_interconnect();
+
+		// Execute NOP (0x00)
+		let cycles = cpu.execute_opcode(&mut inter, 0x00);
+
+		assert_eq!(cycles, 4);
+		// NOP shouldn't change any registers
+	}
+
+	#[test]
+	fn test_dec_bc_opcode() {
+		let mut cpu = Cpu::new();
+		let mut inter = create_test_interconnect();
+
+		let initial_bc = cpu.regs_bc.get();
+
+		// Execute DEC BC (0x0B)
+		let cycles = cpu.execute_opcode(&mut inter, 0x0B);
+
+		assert_eq!(cycles, 8);
+		assert_eq!(cpu.regs_bc.get(), initial_bc.wrapping_sub(1));
+	}
+
+	#[test]
+	fn test_cpl_opcode() {
+		let mut cpu = Cpu::new();
+		let mut inter = create_test_interconnect();
+
+		// Set A register to a known value
+		cpu.set_reg_a(0b10101010);
+
+		// Execute CPL (0x2F) - complement A register
+		let cycles = cpu.execute_opcode(&mut inter, 0x2F);
+
+		assert_eq!(cycles, 4);
+		assert_eq!(cpu.get_reg_a(), 0b01010101);
+		assert!(cpu.flags.n); // N flag should be set
+		assert!(cpu.flags.h); // H flag should be set
+	}
+
+	#[test]
+	fn test_ld_c_b_opcode() {
+		let mut cpu = Cpu::new();
+		let mut inter = create_test_interconnect();
+
+		// Set B register to a known value
+		cpu.set_reg_b(0x42);
+
+		// Execute LD C, B (0x48)
+		let cycles = cpu.execute_opcode(&mut inter, 0x48);
+
+		assert_eq!(cycles, 4);
+		assert_eq!(cpu.get_reg_c(), 0x42);
+		assert_eq!(cpu.get_reg_b(), 0x42); // B should remain unchanged
+	}
+
+	#[test]
+	fn test_ld_c_d_opcode() {
+		let mut cpu = Cpu::new();
+		let mut inter = create_test_interconnect();
+
+		// Set D register to a known value
+		cpu.set_reg_d(0x37);
+
+		// Execute LD C, D (0x4A)
+		let cycles = cpu.execute_opcode(&mut inter, 0x4A);
+
+		assert_eq!(cycles, 4);
+		assert_eq!(cpu.get_reg_c(), 0x37);
+	}
+
+	#[test]
+	fn test_register_getters_setters() {
+		let mut cpu = Cpu::new();
+
+		// Test A register
+		cpu.set_reg_a(0xFF);
+		assert_eq!(cpu.get_reg_a(), 0xFF);
+
+		// Test B register
+		cpu.set_reg_b(0xAB);
+		assert_eq!(cpu.get_reg_b(), 0xAB);
+
+		// Test D register
+		cpu.set_reg_d(0xCD);
+		assert_eq!(cpu.get_reg_d(), 0xCD);
+	}
+
+	#[test]
+	fn test_flag_setters() {
+		let mut cpu = Cpu::new();
+
+		cpu.set_zero_flag(true);
+		assert!(cpu.flags.z);
+
+		cpu.set_subtract_flag(true);
+		assert!(cpu.flags.n);
+
+		cpu.set_half_carry_flag(true);
+		assert!(cpu.flags.h);
+
+		cpu.set_carry_flag(true);
+		assert!(cpu.flags.c);
+	}
 }

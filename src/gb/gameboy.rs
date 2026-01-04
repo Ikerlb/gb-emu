@@ -1,5 +1,5 @@
-use gb::cpu::*;
-use gb::interconnect::*;
+use crate::gb::cpu::*;
+use crate::gb::interconnect::*;
 use std::fmt::{Display,Result,Formatter};
 
 pub struct GameBoy{
