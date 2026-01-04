@@ -16,14 +16,125 @@ Building a complete Game Boy emulator is a substantial undertaking. This roadmap
 - [x] Update dependencies to modern versions
 - [x] Fix deprecated syntax (range patterns, module imports)
 - [x] Create README and documentation
-- [ ] Add comprehensive unit tests for existing components
-- [ ] Set up integration test framework
+- [x] Add comprehensive unit tests for existing components
+- [x] Fix critical Register byte ordering bug
 
 **Estimated Effort:** 2-3 days
 
 ---
 
-## Phase 2: CPU Completion (Critical Path)
+## Phase 2: Debug & Visualization Infrastructure ⚡ **HIGH PRIORITY**
+
+**Goal:** Build comprehensive debugging tools to visualize emulator state
+
+This phase is critical for efficient development. Without good debugging tools, tracking down issues in CPU opcodes, memory operations, and PPU rendering becomes exponentially harder.
+
+### Core Debugging Features
+
+**2.1 State Display System**
+- CPU state viewer:
+  - All registers (PC, SP, AF, BC, DE, HL) with hex/decimal display
+  - All flags (Z, N, H, C) with visual indicators
+  - Current instruction and next few instructions (disassembly)
+  - Cycle counter
+- Memory viewer:
+  - Configurable memory window (address range selector)
+  - Hex dump with ASCII representation
+  - Highlighting for different regions (ROM, RAM, VRAM, etc.)
+  - Watch specific addresses
+- Execution state:
+  - Current opcode being executed
+  - Instruction history (last N instructions)
+  - Call stack visualization
+
+**2.2 Interactive Debugger**
+- Step execution (step-into, step-over)
+- Breakpoints:
+  - Address breakpoints (break at PC = 0xXXXX)
+  - Memory breakpoints (break on read/write to address)
+  - Conditional breakpoints
+- Run/pause/reset controls
+- Save/load emulator state (snapshots)
+
+**2.3 Logging System**
+- Configurable log levels (TRACE, DEBUG, INFO, WARN, ERROR)
+- Per-component logging (CPU, Memory, Cartridge, etc.)
+- Log to file and/or console
+- Instruction trace mode (logs every instruction executed)
+
+**2.4 Visual Diff Tools**
+- Compare emulator state against known-good state
+- Useful for comparing against test ROM expected outputs
+- Register diff viewer
+- Memory diff viewer
+
+### Implementation Strategy
+
+**Phase 2A: Basic State Display (1-2 days)**
+1. Implement `Display` traits for all stateful structs
+2. Create debug print functions for CPU, memory, flags
+3. Add `--debug` flag to show state after each instruction
+
+**Phase 2B: Memory Viewer (1 day)**
+1. Create memory dump function
+2. Add address range viewer
+3. Implement hex dump formatting
+
+**Phase 2C: Interactive Debugger (2-3 days)**
+1. Add step-by-step execution mode
+2. Implement breakpoint system
+3. Create simple REPL interface for debugging commands
+
+**Phase 2D: Logging Infrastructure (1 day)**
+1. Integrate `env_logger` or `tracing` crate
+2. Add log statements throughout codebase
+3. Create instruction trace mode
+
+**Phase 2E: Advanced Features (Optional, 1-2 days)**
+1. TUI (Terminal UI) using `ratatui` for better visualization
+2. Save/load state functionality
+3. Compare with reference implementation
+
+### Benefits
+
+- **Faster Development:** Immediately see what's wrong when a test fails
+- **Better Understanding:** Visualize how the emulator works internally
+- **Easier Testing:** Compare state with known-good emulators
+- **Learning Tool:** See exactly how Game Boy hardware behaves
+
+### Dependencies to Add
+
+```toml
+env_logger = "0.11"  # or tracing = "0.1"
+log = "0.4"
+# Optional:
+ratatui = "0.26"  # For TUI
+crossterm = "0.27"  # Terminal manipulation
+```
+
+### Example Usage
+
+```bash
+# Run with instruction trace
+cargo run --release -- rom.gb --trace
+
+# Run with debugger
+cargo run --release -- rom.gb --debug
+
+# Run with breakpoint
+cargo run --release -- rom.gb --break 0x0150
+
+# Dump memory range
+cargo run --release -- rom.gb --dump-mem 0x8000:0x9FFF
+```
+
+**Estimated Effort:** 5-7 days
+
+**This phase should be completed BEFORE extensive CPU opcode implementation!**
+
+---
+
+## Phase 3: CPU Completion (Critical Path)
 
 **Goal:** Implement all 256+ CPU opcodes
 
@@ -83,7 +194,7 @@ The most frequently used instructions that appear in simple ROMs:
 
 ---
 
-## Phase 3: Memory Map Completion
+## Phase 4: Memory Map Completion
 
 **Goal:** Implement full Game Boy memory map
 
@@ -125,7 +236,7 @@ Current state: Only cartridge regions (0x0000-0x7FFF, 0xA000-0xBFFF) implemented
 
 ---
 
-## Phase 4: Timer Implementation
+## Phase 5: Timer Implementation
 
 **Goal:** Implement the 4 timer-related registers
 
@@ -155,7 +266,7 @@ Timers are relatively simple but required for many games.
 
 ---
 
-## Phase 5: Interrupt System
+## Phase 6: Interrupt System
 
 **Goal:** Implement interrupt handling mechanism
 
@@ -191,7 +302,7 @@ Timers are relatively simple but required for many games.
 
 ---
 
-## Phase 6: PPU (Graphics) - The Big One
+## Phase 7: PPU (Graphics) - The Big One
 
 **Goal:** Implement pixel processing unit for graphics
 
@@ -266,7 +377,7 @@ Implement all LCD control registers:
 
 ---
 
-## Phase 7: Input Handling
+## Phase 8: Input Handling
 
 **Goal:** Implement joypad input
 
@@ -296,7 +407,7 @@ Implement all LCD control registers:
 
 ---
 
-## Phase 8: APU (Audio) - Optional
+## Phase 9: APU (Audio) - Optional
 
 **Goal:** Implement audio processing unit
 
@@ -323,7 +434,7 @@ Audio is complex but not required for basic playability.
 
 ---
 
-## Phase 9: Advanced Features
+## Phase 10: Advanced Features
 
 **Goal:** Handle edge cases and advanced functionality
 
@@ -344,7 +455,7 @@ Audio is complex but not required for basic playability.
 
 ---
 
-## Phase 10: Testing & Accuracy
+## Phase 11: Testing & Accuracy
 
 **Goal:** Improve accuracy and compatibility
 
@@ -379,7 +490,7 @@ Audio is complex but not required for basic playability.
 
 ---
 
-## Phase 11: Performance & Polish
+## Phase 12: Performance & Polish
 
 **Goal:** Optimize and add quality-of-life features
 
@@ -403,21 +514,24 @@ Audio is complex but not required for basic playability.
 
 | Phase | Component | Estimated Time |
 |-------|-----------|----------------|
-| 1 | Foundation & Testing | 2-3 days |
-| 2 | CPU Completion | 2-3 weeks |
-| 3 | Memory Map | 3-4 days |
-| 4 | Timer | 2-3 days |
-| 5 | Interrupts | 3-4 days |
-| 6 | PPU (Graphics) | 3-4 weeks |
-| 7 | Input | 2-3 days |
-| 8 | APU (Audio) | 2-3 weeks (optional) |
-| 9 | Advanced Features | 1 week |
-| 10 | Testing & Accuracy | Ongoing |
-| 11 | Polish | Variable |
+| 1 | Foundation & Testing | 2-3 days ✅ |
+| 2 | **Debug & Visualization** ⚡ | **5-7 days** |
+| 3 | CPU Completion | 2-3 weeks |
+| 4 | Memory Map | 3-4 days |
+| 5 | Timer | 2-3 days |
+| 6 | Interrupts | 3-4 days |
+| 7 | PPU (Graphics) | 3-4 weeks |
+| 8 | Input | 2-3 days |
+| 9 | APU (Audio) | 2-3 weeks (optional) |
+| 10 | Advanced Features | 1 week |
+| 11 | Testing & Accuracy | Ongoing |
+| 12 | Polish | Variable |
 
-**Total Estimated Time (without audio):** 10-14 weeks of focused development
+**Total Estimated Time (without audio):** 11-15 weeks of focused development
 
-**Total Estimated Time (with audio):** 12-17 weeks
+**Total Estimated Time (with audio):** 13-18 weeks
+
+**Note:** Phase 2 (Debug & Visualization) is a high-value investment that will save significant debugging time in later phases.
 
 ---
 
@@ -426,17 +540,21 @@ Audio is complex but not required for basic playability.
 To see visible progress quickly, consider this alternative order:
 
 1. ✅ **Foundation** (done!)
-2. **Memory Map** - Quick implementation
-3. **Basic PPU** - Get pixels on screen ASAP (background only, no sprites)
-4. **Common CPU Opcodes** - Just enough to run simple code
-5. **Timer** - Simple and satisfying
-6. **Interrupts** - Unlocks V-Blank
-7. **Full PPU** - Sprites and polish
-8. **Complete CPU** - Fill in remaining opcodes
-9. **Input** - Make it playable!
-10. **Audio & Polish**
+2. ⚡ **Basic Debug Tools** - State display and logging (Phase 2A-2B, ~2-3 days)
+   - This is critical - you'll need it immediately for debugging opcodes
+3. **Memory Map** - Quick implementation
+4. **Common CPU Opcodes** - Just enough to run simple code (with debug tools to verify!)
+5. **Basic PPU** - Get pixels on screen ASAP (background only, no sprites)
+6. **Timer** - Simple and satisfying
+7. **Interrupts** - Unlocks V-Blank
+8. **Full PPU** - Sprites and polish
+9. **Complete CPU** - Fill in remaining opcodes
+10. **Input** - Make it playable!
+11. **Audio & Polish**
 
-This approach prioritizes **visible progress** - you'll see pixels on screen much sooner, which is incredibly motivating!
+This approach prioritizes **visible progress** AND **developer efficiency** - you'll have debugging tools from the start and see pixels on screen sooner!
+
+**Recommended Next Step:** Start with Phase 2A (Basic State Display) - just 1-2 days of work that will make everything else 10x easier.
 
 ---
 
@@ -465,11 +583,31 @@ This approach prioritizes **visible progress** - you'll see pixels on screen muc
 
 ## Current Priority
 
-Based on the current state, I recommend:
+**Phase 1 Complete! ✅** Now moving to Phase 2.
 
-**Next 3 Tasks:**
-1. Add comprehensive tests for CPU, Interconnect, and Cartridge components
-2. Implement Priority 1 CPU opcodes (LD instructions first)
-3. Begin basic PPU implementation (background rendering only)
+**Recommended Next Phase: Phase 2 - Debug & Visualization Infrastructure**
 
-This will give you a solid foundation and visible progress toward the first playable build.
+**Why start here?**
+- You'll need debugging tools IMMEDIATELY when implementing CPU opcodes
+- Trying to debug without state visibility is incredibly frustrating
+- A 5-7 day investment now saves weeks of debugging later
+- Makes learning how the Game Boy works much more intuitive
+
+**Suggested Approach:**
+1. **Start with Phase 2A** (1-2 days) - Basic state display
+   - Add `--debug` flag to show CPU state after each instruction
+   - Implement pretty-printing for registers and flags
+   - Add simple memory viewer
+2. **Then Phase 2B** (1 day) - Logging system
+   - Add `env_logger` crate
+   - Create instruction trace mode
+   - Per-component log levels
+3. **Consider Phase 2C** (2-3 days) - Interactive debugger
+   - Step-by-step execution
+   - Breakpoints
+   - Much easier to track down bugs
+
+**Alternative (if you want quick visual wins):**
+Skip straight to implementing a few CPU opcodes, but you'll likely wish you had debug tools within an hour!
+
+The investment in debugging infrastructure now will make everything else 10x faster and more enjoyable.
