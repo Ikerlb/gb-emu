@@ -2,6 +2,7 @@ use crate::gb::interconnect::*;
 use crate::gb::opcode::Opcode;
 use num_traits::FromPrimitive;
 use crate::gb::register::Register;
+use std::fmt::{Display, Formatter, Result};
 
 //FINISH TESTS!!!
 
@@ -29,8 +30,52 @@ struct Flags{
 	c: bool
 }
 
+impl Display for Flags {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        write!(f, "Z:{} N:{} H:{} C:{}",
+            self.z as u8, self.n as u8, self.h as u8, self.c as u8)
+    }
+}
+
+impl Display for Cpu {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        write!(f, "PC:{:04X} SP:{} AF:{} BC:{} DE:{} HL:{} [{}]",
+            self.reg_pc,
+            self.reg_sp,
+            self.regs_af,
+            self.regs_bc,
+            self.regs_de,
+            self.regs_hl,
+            self.flags
+        )
+    }
+}
+
 //Get rid of all the sets? Good or bad practice? DOIT!
 impl Cpu{
+
+	/// Get the program counter value
+	pub fn pc(&self) -> u16 {
+		self.reg_pc
+	}
+
+	/// Format CPU state in verbose multi-line format
+	pub fn format_verbose(&self) -> String {
+		format!(
+			"=== CPU State ===\n\
+			 PC: 0x{:04X}  SP: 0x{:04X}\n\
+			 AF: 0x{:04X} (A=0x{:02X}, F=0x{:02X})  BC: 0x{:04X} (B=0x{:02X}, C=0x{:02X})\n\
+			 DE: 0x{:04X} (D=0x{:02X}, E=0x{:02X})  HL: 0x{:04X} (H=0x{:02X}, L=0x{:02X})\n\
+			 Flags: {}",
+			self.reg_pc,
+			self.reg_sp.get(),
+			self.regs_af.get(), self.regs_af.get_hi(), self.regs_af.get_lo(),
+			self.regs_bc.get(), self.regs_bc.get_hi(), self.regs_bc.get_lo(),
+			self.regs_de.get(), self.regs_de.get_hi(), self.regs_de.get_lo(),
+			self.regs_hl.get(), self.regs_hl.get_hi(), self.regs_hl.get_lo(),
+			self.flags
+		)
+	}
 
 	//set zero flag
 	fn set_zero_flag(&mut self,bit: bool){
@@ -134,7 +179,6 @@ impl Cpu{
 		let value=Opcode::from_u8(opcode).unwrap_or_else(||
             panic!("Unrecognized Opcode: {:#X})",opcode)
         );
-        println!("Currently running opcode {:#X} from address {:#X}",opcode,self.reg_pc-1);
         //TODO: Look for a way to remove the Opcode::opcode
 		match value{
 			//0x00
