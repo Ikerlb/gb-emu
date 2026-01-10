@@ -1,10 +1,19 @@
 //TODO make attributes public????????????
 //struct register to model 8bits registers being paired
+
+use std::fmt::{Display, Formatter, Result};
+
 #[derive(Debug)]
 pub struct Register{
 	//i.e HL Reg => H=Hi, L=Lo
-	hi: u8, 
+	hi: u8,
 	lo: u8,
+}
+
+impl Display for Register {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        write!(f, "{:04X}", self.get())
+    }
 }
 
 impl Register{
