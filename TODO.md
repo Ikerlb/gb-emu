@@ -19,6 +19,7 @@ This document tracks known issues and planned improvements in the codebase.
 - **Line 31**: Complete write handling for all memory regions
 
 ### Cartridge (`src/gb/cartridge.rs`)
+- **Line 127-132**: Potential banking bug in `read()` - The formula `(address - 0x4000) + (0x4000 * current_rom)` is applied to ALL addresses 0x0000-0x7FFF, but addresses 0x0000-0x3FFF should always read from ROM bank 0 (fixed). If `current_rom != 1`, reads from 0x0000-0x3FFF will incorrectly read from the wrong ROM offset.
 - **Line 164**: Implement MBC3 write operations (currently stubbed)
 - **Line 126**: Thoroughly test cartridge read/write operations
 - **Line 1**: Review and optimize integer types to minimize casting
