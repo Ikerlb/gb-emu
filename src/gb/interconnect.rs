@@ -22,6 +22,16 @@ impl Interconnect{
         }
     }
 
+    /// Attempts to read a byte from the given address.
+    /// Returns None for unimplemented memory regions instead of panicking.
+    pub fn try_read(&self, address: u16) -> Option<u8> {
+        match address {
+            0x0000..=0x7FFF |
+            0xA000..=0xBFFF => Some(self.cartridge.read(address)),
+            _ => None,
+        }
+    }
+
     //reads 16bits
     pub fn read_16bits(&self,address:u16)->u16{
         (self.read(address) as u16) << 8 | (self.read(address+1) as u16)
@@ -103,5 +113,33 @@ mod tests {
         let inter = Interconnect::new(rom);
         let value = inter.read_16bits(0x0000);
         assert_eq!(value, 0xFF00);
+    }
+
+    #[test]
+    fn test_try_read_rom() {
+        let mut rom = create_test_rom();
+        rom[0x0100] = 0xAB;
+        rom[0x4000] = 0xCD;
+
+        let inter = Interconnect::new(rom);
+
+        // ROM addresses should return Some
+        assert_eq!(inter.try_read(0x0100), Some(0xAB));
+        assert_eq!(inter.try_read(0x4000), Some(0xCD));
+        assert_eq!(inter.try_read(0x0000), Some(0x00));
+    }
+
+    #[test]
+    fn test_try_read_unimplemented() {
+        let rom = create_test_rom();
+        let inter = Interconnect::new(rom);
+
+        // Unimplemented regions should return None
+        assert_eq!(inter.try_read(0x8000), None); // VRAM
+        assert_eq!(inter.try_read(0xC000), None); // WRAM
+        assert_eq!(inter.try_read(0xFE00), None); // OAM
+        assert_eq!(inter.try_read(0xFF00), None); // I/O
+        assert_eq!(inter.try_read(0xFF80), None); // HRAM
+        assert_eq!(inter.try_read(0xFFFF), None); // IE register
     }
 }
