@@ -62,18 +62,28 @@ impl Cpu{
 	/// Format CPU state in verbose multi-line format
 	pub fn format_verbose(&self) -> String {
 		format!(
-			"=== CPU State ===\n\
-			 PC: 0x{:04X}  SP: 0x{:04X}\n\
-			 AF: 0x{:04X} (A=0x{:02X}, F=0x{:02X})  BC: 0x{:04X} (B=0x{:02X}, C=0x{:02X})\n\
-			 DE: 0x{:04X} (D=0x{:02X}, E=0x{:02X})  HL: 0x{:04X} (H=0x{:02X}, L=0x{:02X})\n\
-			 Flags: {}",
+"=== CPU State ===
+Registers:
+  PC: 0x{:04X}  SP: 0x{:04X}
+  AF: 0x{:04X} (A=0x{:02X}, F=0x{:02X})
+  BC: 0x{:04X} (B=0x{:02X}, C=0x{:02X})
+  DE: 0x{:04X} (D=0x{:02X}, E=0x{:02X})
+  HL: 0x{:04X} (H=0x{:02X}, L=0x{:02X})
+Flags:
+  Z:{}
+  N:{}
+  H:{}
+  C:{}",
 			self.reg_pc,
 			self.reg_sp.get(),
 			self.regs_af.get(), self.regs_af.get_hi(), self.regs_af.get_lo(),
 			self.regs_bc.get(), self.regs_bc.get_hi(), self.regs_bc.get_lo(),
 			self.regs_de.get(), self.regs_de.get_hi(), self.regs_de.get_lo(),
 			self.regs_hl.get(), self.regs_hl.get_hi(), self.regs_hl.get_lo(),
-			self.flags
+			self.flags.z as u8,
+			self.flags.n as u8,
+			self.flags.h as u8,
+			self.flags.c as u8
 		)
 	}
 
