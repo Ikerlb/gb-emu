@@ -70,12 +70,14 @@ This phase is critical for efficient development. Without good debugging tools, 
 
 ### Implementation Strategy
 
-**Phase 2A: Basic State Display (1-2 days)**
-1. Implement `Display` traits for all stateful structs
-2. Create debug print functions for CPU, memory, flags
-3. Add `--debug` flag to show state after each instruction
+**Phase 2A: Basic State Display (1-2 days) ✅ COMPLETED**
+1. ✅ Implement `Display` traits for all stateful structs
+2. ✅ Create debug print functions for CPU, memory, flags
+3. ✅ Add `--debug` flag to show state after each instruction
+4. ✅ Add `--verbose` flag for multi-line debug format
+5. ✅ Add `--max-instructions` flag for limiting execution
 
-**Phase 2B: Memory Viewer (1 day)**
+**Phase 2B: Memory Viewer (1 day)** ⬅️ **NEXT**
 1. Create memory dump function
 2. Add address range viewer
 3. Implement hex dump formatting
@@ -515,7 +517,7 @@ Audio is complex but not required for basic playability.
 | Phase | Component | Estimated Time |
 |-------|-----------|----------------|
 | 1 | Foundation & Testing | 2-3 days ✅ |
-| 2 | **Debug & Visualization** ⚡ | **5-7 days** |
+| 2 | Debug & Visualization | 5-7 days (2A ✅, 2B-2E pending) |
 | 3 | CPU Completion | 2-3 weeks |
 | 4 | Memory Map | 3-4 days |
 | 5 | Timer | 2-3 days |
@@ -540,9 +542,8 @@ Audio is complex but not required for basic playability.
 To see visible progress quickly, consider this alternative order:
 
 1. ✅ **Foundation** (done!)
-2. ⚡ **Basic Debug Tools** - State display and logging (Phase 2A-2B, ~2-3 days)
-   - This is critical - you'll need it immediately for debugging opcodes
-3. **Memory Map** - Quick implementation
+2. ✅ **Basic Debug Tools** - State display (Phase 2A done!)
+3. ⚡ **Memory Map** - Quick implementation (Phase 4)
 4. **Common CPU Opcodes** - Just enough to run simple code (with debug tools to verify!)
 5. **Basic PPU** - Get pixels on screen ASAP (background only, no sprites)
 6. **Timer** - Simple and satisfying
@@ -583,31 +584,25 @@ This approach prioritizes **visible progress** AND **developer efficiency** - yo
 
 ## Current Priority
 
-**Phase 1 Complete! ✅** Now moving to Phase 2.
+**Phase 2A Complete! ✅** Basic debug infrastructure is in place.
 
-**Recommended Next Phase: Phase 2 - Debug & Visualization Infrastructure**
+**Current Phase: Phase 2B - Memory Viewer** ⬅️ **START HERE**
 
-**Why start here?**
-- You'll need debugging tools IMMEDIATELY when implementing CPU opcodes
-- Trying to debug without state visibility is incredibly frustrating
-- A 5-7 day investment now saves weeks of debugging later
-- Makes learning how the Game Boy works much more intuitive
+**What's been done (Phase 2A):**
+- ✅ `--debug` flag shows CPU state after each instruction
+- ✅ `--verbose` flag for multi-line debug format
+- ✅ `--max-instructions` flag for limiting execution
+- ✅ Pretty-printing for registers and flags
 
-**Suggested Approach:**
-1. **Start with Phase 2A** (1-2 days) - Basic state display
-   - Add `--debug` flag to show CPU state after each instruction
-   - Implement pretty-printing for registers and flags
-   - Add simple memory viewer
-2. **Then Phase 2B** (1 day) - Logging system
-   - Add `env_logger` crate
-   - Create instruction trace mode
-   - Per-component log levels
-3. **Consider Phase 2C** (2-3 days) - Interactive debugger
-   - Step-by-step execution
-   - Breakpoints
-   - Much easier to track down bugs
+**Next Steps (Phase 2B):**
+1. Create memory dump function
+2. Add address range viewer (e.g., `--dump-mem 0x8000:0x9FFF`)
+3. Implement hex dump formatting with ASCII representation
 
-**Alternative (if you want quick visual wins):**
-Skip straight to implementing a few CPU opcodes, but you'll likely wish you had debug tools within an hour!
+**After that (Phase 2C):**
+- Step-by-step execution mode
+- Breakpoint system
+- Simple REPL interface for debugging commands
 
-The investment in debugging infrastructure now will make everything else 10x faster and more enjoyable.
+**Alternative Path:**
+If you're eager to see more progress, you could jump to Phase 4 (Memory Map Completion) since it's relatively quick and unblocks CPU testing. The memory viewer can be added incrementally as needed.
