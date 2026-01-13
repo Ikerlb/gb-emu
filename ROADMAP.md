@@ -77,15 +77,16 @@ This phase is critical for efficient development. Without good debugging tools, 
 4. ✅ Add `--verbose` flag for multi-line debug format
 5. ✅ Add `--max-instructions` flag for limiting execution
 
-**Phase 2B: Memory Viewer (1 day)** ⬅️ **NEXT**
-1. Create memory dump function
-2. Add address range viewer
-3. Implement hex dump formatting
+**Phase 2B: Memory Viewer (1 day)** ✅ COMPLETED
+1. ✅ Create memory dump function
+2. ✅ Add address range viewer (`--dump-mem`)
+3. ✅ Implement hex dump formatting
 
-**Phase 2C: Interactive Debugger (2-3 days)**
-1. Add step-by-step execution mode
-2. Implement breakpoint system
-3. Create simple REPL interface for debugging commands
+**Phase 2C: Interactive Debugger (2-3 days)** ✅ COMPLETED
+1. ✅ Add step-by-step execution mode (`--interactive` flag)
+2. ✅ Implement breakpoint system (address breakpoints)
+3. ✅ Create REPL interface with vi keybindings (rustyline)
+4. ✅ Tab completion, hints, command history
 
 **Phase 2D: Logging Infrastructure (1 day)**
 1. Integrate `env_logger` or `tracing` crate
@@ -517,7 +518,7 @@ Audio is complex but not required for basic playability.
 | Phase | Component | Estimated Time |
 |-------|-----------|----------------|
 | 1 | Foundation & Testing | 2-3 days ✅ |
-| 2 | Debug & Visualization | 5-7 days (2A ✅, 2B-2E pending) |
+| 2 | Debug & Visualization | 5-7 days (2A-2C ✅, 2D-2E optional) |
 | 3 | CPU Completion | 2-3 weeks |
 | 4 | Memory Map | 3-4 days |
 | 5 | Timer | 2-3 days |
@@ -584,25 +585,21 @@ This approach prioritizes **visible progress** AND **developer efficiency** - yo
 
 ## Current Priority
 
-**Phase 2A Complete! ✅** Basic debug infrastructure is in place.
+**Phase 2A-C Complete! ✅** Debug infrastructure is fully in place.
 
-**Current Phase: Phase 2B - Memory Viewer** ⬅️ **START HERE**
-
-**What's been done (Phase 2A):**
+**What's been done:**
 - ✅ `--debug` flag shows CPU state after each instruction
 - ✅ `--verbose` flag for multi-line debug format
 - ✅ `--max-instructions` flag for limiting execution
-- ✅ Pretty-printing for registers and flags
+- ✅ `--dump-mem` for hex memory dumps with ASCII
+- ✅ `--interactive` for full debugger REPL
+- ✅ Breakpoints, stepping, vi keybindings, tab completion, history
 
-**Next Steps (Phase 2B):**
-1. Create memory dump function
-2. Add address range viewer (e.g., `--dump-mem 0x8000:0x9FFF`)
-3. Implement hex dump formatting with ASCII representation
+**Next Phase: Phase 2D - Logging Infrastructure** ⬅️ **OPTIONAL**
+- Integrate `env_logger` or `tracing` crate
+- Per-component logging
 
-**After that (Phase 2C):**
-- Step-by-step execution mode
-- Breakpoint system
-- Simple REPL interface for debugging commands
+**Recommended Next Step:** Skip to Phase 3 (CPU Completion) or Phase 4 (Memory Map) - the debugger is ready to help track down issues!
 
 **Alternative Path:**
-If you're eager to see more progress, you could jump to Phase 4 (Memory Map Completion) since it's relatively quick and unblocks CPU testing. The memory viewer can be added incrementally as needed.
+Phase 4 (Memory Map Completion) is quick and unblocks CPU testing. Currently only cartridge regions work; WRAM, HRAM, VRAM, OAM, and I/O registers still panic.

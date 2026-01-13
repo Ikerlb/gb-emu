@@ -23,7 +23,13 @@ cargo run -- -f "Tetris (World).gb" --debug --max-instructions 10
 # Short flags version
 cargo run -- -f "Tetris (World).gb" -d -v -m 10
 
-# Run all tests (28 tests across 4 modules)
+# Run interactive debugger
+cargo run -- -f "Tetris (World).gb" --interactive
+
+# Dump memory range after execution
+cargo run -- -f "Tetris (World).gb" -m 10 --dump-mem 0x0100:0x010F
+
+# Run all tests
 cargo test
 
 # Run specific test
@@ -58,6 +64,25 @@ GameBoy (orchestrator)
 - **`src/gb/interconnect.rs`** - Memory bus routing to appropriate hardware components
 - **`src/gb/cartridge.rs`** - ROM loading, RAM allocation, and Memory Bank Controller (MBC0, MBC1 implemented; MBC2, MBC3 stubbed)
 - **`src/gb/debug.rs`** - Debug configuration (DebugConfig struct with CLI flag settings)
+- **`src/gb/debugger.rs`** - Interactive debugger with REPL, breakpoints, vi keybindings
+
+### Interactive Debugger
+
+Run with `--interactive` or `-i` to enter the debugger. Commands:
+
+| Command | Alias | Description |
+|---------|-------|-------------|
+| `step` | `s` | Execute one instruction |
+| `continue` | `c` | Run until breakpoint or halt |
+| `break <addr>` | `b` | Set breakpoint (e.g., `b 0x150`) |
+| `delete <id>` | `d` | Remove breakpoint by ID |
+| `list` | `l` | Show all breakpoints |
+| `reg` | `r` | Show CPU registers |
+| `mem <range>` | `m` | Dump memory (e.g., `m 0x0000:0x00FF`) |
+| `help` | `h` | Show help |
+| `quit` | `q` | Exit |
+
+Features: Vi keybindings (ESC for normal mode), tab completion, command hints, persistent history (~/.gb_emu_history), empty Enter repeats last command.
 
 ### Memory Map Status
 

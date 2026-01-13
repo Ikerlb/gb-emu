@@ -58,6 +58,14 @@ impl GameBoy {
         }
     }
 
+    /// Execute a single instruction. Returns true if CPU is halted.
+    pub fn step(&mut self) -> bool {
+        self.cpu.execute_next_opcode(&mut self.interconnect);
+        self.instruction_count += 1;
+        // TODO: Return actual halt state when HALT opcode is implemented
+        false
+    }
+
     fn print_debug_state(&self, pc: u16, opcode_byte: u8, opcode: Option<&Opcode>) {
         let opcode_str = match opcode {
             Some(op) => format!("{}", op),

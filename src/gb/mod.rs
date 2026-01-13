@@ -6,3 +6,4 @@ pub mod gameboy;
 pub mod register;
 pub mod cartridge;
 pub mod debug;
+pub mod debugger;
