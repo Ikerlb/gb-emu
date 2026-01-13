@@ -10,6 +10,13 @@ use rustyline::{Config, Context, EditMode, Editor, Helper};
 use std::borrow::Cow;
 use std::collections::HashSet;
 
+// Minimalist ANSI codes - bold/dim for visual hierarchy
+mod style {
+    pub const RESET: &str = "\x1b[0m";
+    pub const BOLD: &str = "\x1b[1m";
+    pub const DIM: &str = "\x1b[2m";
+}
+
 /// Debugger commands
 #[derive(Debug, Clone, PartialEq)]
 pub enum Command {
@@ -66,12 +73,10 @@ impl BreakpointManager {
 
     /// Check if we should break at the given address
     pub fn should_break(&self, addr: u16) -> bool {
-        for (id, &bp_addr) in self.breakpoints.iter().enumerate() {
-            if self.enabled.contains(&id) && bp_addr == addr {
-                return true;
-            }
-        }
-        false
+        self.breakpoints
+            .iter()
+            .enumerate()
+            .any(|(id, &bp_addr)| self.enabled.contains(&id) && bp_addr == addr)
     }
 
     /// Get all breakpoints for display
@@ -217,8 +222,7 @@ impl Hinter for DebuggerHelper {
 
 impl Highlighter for DebuggerHelper {
     fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
-        // Grey color for hints
-        Cow::Owned(format!("\x1b[90m{}\x1b[0m", hint))
+        Cow::Owned(format!("{}{}{}", style::DIM, hint, style::RESET))
     }
 }
 
@@ -309,15 +313,15 @@ impl Debugger {
 
     /// Run the interactive debugger
     pub fn run(&mut self, gb: &mut GameBoy) {
-        println!("Game Boy Debugger");
-        println!("Type 'help' for commands, Ctrl+C or 'quit' to exit");
-        println!("Vi keybindings enabled (ESC for normal mode)\n");
+        println!("{}─ GAME BOY DEBUGGER ─{}", style::BOLD, style::RESET);
+        println!("{}Type 'help' for commands, 'quit' to exit{}", style::DIM, style::RESET);
+        println!("{}Vi mode: ESC for normal, i for insert{}\n", style::DIM, style::RESET);
 
         // Show initial state
-        println!("{}\n", gb.cpu());
+        self.print_cpu_state(gb);
 
         loop {
-            let prompt = format!("(0x{:04X})> ", gb.cpu().pc());
+            let prompt = format!("({:04X}) λ ", gb.cpu().pc());
             match self.editor.readline(&prompt) {
                 Ok(line) => {
                     let result = parse_command(&line);
@@ -366,7 +370,7 @@ impl Debugger {
         match cmd {
             Command::Step => {
                 gb.step();
-                println!("{}", gb.cpu());
+                self.print_cpu_state(gb);
             }
             Command::Continue => {
                 self.run_until_breakpoint(gb);
@@ -392,7 +396,7 @@ impl Debugger {
                 }
             }
             Command::Registers => {
-                println!("{}", gb.cpu().format_verbose());
+                self.print_cpu_state(gb);
             }
             Command::Memory(range) => {
                 println!(
@@ -422,8 +426,8 @@ impl Debugger {
         loop {
             let pc = gb.cpu().pc();
             if self.breakpoints.should_break(pc) && steps > 0 {
-                println!("Breakpoint hit at 0x{:04X}", pc);
-                println!("{}", gb.cpu());
+                println!("{}Breakpoint{} at {:04X}", style::BOLD, style::RESET, pc);
+                self.print_cpu_state(gb);
                 break;
             }
 
@@ -431,15 +435,15 @@ impl Debugger {
             steps += 1;
 
             if halted {
-                println!("CPU halted after {} instructions", steps);
-                println!("{}", gb.cpu());
+                println!("{}Halted{} after {} instructions", style::DIM, style::RESET, steps);
+                self.print_cpu_state(gb);
                 break;
             }
 
             // Safety limit to prevent infinite loops
             if steps > 10_000_000 {
-                println!("Ran {} instructions without hitting breakpoint. Stopping.", steps);
-                println!("{}", gb.cpu());
+                println!("{}Stopped{} after {} instructions", style::DIM, style::RESET, steps);
+                self.print_cpu_state(gb);
                 break;
             }
         }
@@ -464,5 +468,45 @@ Tips:
   - Tab to autocomplete commands
   - Up/Down arrows for command history"#
         );
+    }
+
+    /// Print CPU state with visual hierarchy (dim labels, bold values)
+    fn print_cpu_state(&self, gb: &GameBoy) {
+        let cpu = gb.cpu();
+
+        // Registers line: dim labels, bold values
+        let regs = [
+            ("PC", cpu.pc()),
+            ("SP", cpu.sp()),
+            ("AF", cpu.af()),
+            ("BC", cpu.bc()),
+            ("DE", cpu.de()),
+            ("HL", cpu.hl()),
+        ];
+        let reg_line: Vec<String> = regs
+            .iter()
+            .map(|(name, val)| {
+                format!(
+                    "{}{}:{}{}{:04X}{}",
+                    style::DIM, name, style::RESET, style::BOLD, val, style::RESET
+                )
+            })
+            .collect();
+        println!("{}", reg_line.join("  "));
+
+        // Flags: uppercase=set, lowercase=unset
+        let f = (cpu.af() & 0xFF) as u8;
+        let flags = [('Z', 0x80), ('N', 0x40), ('H', 0x20), ('C', 0x10)];
+        let flag_strs: Vec<String> = flags
+            .iter()
+            .map(|(name, mask)| {
+                if f & mask != 0 {
+                    format!("{}{}{}", style::BOLD, name, style::RESET)
+                } else {
+                    format!("{}{}{}", style::DIM, name.to_ascii_lowercase(), style::RESET)
+                }
+            })
+            .collect();
+        println!("{}Flags:{} [ {} ]", style::DIM, style::RESET, flag_strs.join(" "));
     }
 }

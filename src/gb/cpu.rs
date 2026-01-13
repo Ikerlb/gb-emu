@@ -4,10 +4,8 @@ use num_traits::FromPrimitive;
 use crate::gb::register::Register;
 use std::fmt::{Display, Formatter, Result};
 
-//FINISH TESTS!!!
-
 #[derive(Debug)]
-pub struct Cpu{
+pub struct Cpu {
 	//Program counter
 	reg_pc: u16,
 	//Stack pointer
@@ -51,12 +49,36 @@ impl Display for Cpu {
     }
 }
 
-//Get rid of all the sets? Good or bad practice? DOIT!
-impl Cpu{
+impl Cpu {
 
 	/// Get the program counter value
 	pub fn pc(&self) -> u16 {
 		self.reg_pc
+	}
+
+	/// Get the stack pointer value
+	pub fn sp(&self) -> u16 {
+		self.reg_sp.get()
+	}
+
+	/// Get the AF register value
+	pub fn af(&self) -> u16 {
+		self.regs_af.get()
+	}
+
+	/// Get the BC register value
+	pub fn bc(&self) -> u16 {
+		self.regs_bc.get()
+	}
+
+	/// Get the DE register value
+	pub fn de(&self) -> u16 {
+		self.regs_de.get()
+	}
+
+	/// Get the HL register value
+	pub fn hl(&self) -> u16 {
+		self.regs_hl.get()
 	}
 
 	/// Format CPU state in verbose multi-line format
@@ -133,32 +155,31 @@ Flags:
 		self.regs_hl.set_lo(num);
 	}
 
-	//gets
-	fn get_reg_a(&mut self)->u8{
+	fn get_reg_a(&self) -> u8 {
 		self.regs_af.get_hi()
 	}
 
-	fn get_reg_b(&mut self)->u8{
+	fn get_reg_b(&self) -> u8 {
 		self.regs_bc.get_hi()
 	}
 
-	fn get_reg_c(&mut self)->u8{
+	fn get_reg_c(&self) -> u8 {
 		self.regs_bc.get_lo()
 	}
 
-	fn get_reg_d(&mut self)->u8{
+	fn get_reg_d(&self) -> u8 {
 		self.regs_de.get_hi()
 	}
 
-	fn get_reg_e(&mut self)->u8{
+	fn get_reg_e(&self) -> u8 {
 		self.regs_de.get_lo()
 	}
 
-	fn get_reg_h(&mut self)->u8{
+	fn get_reg_h(&self) -> u8 {
 		self.regs_hl.get_hi()
 	}
 
-	fn get_reg_l(&mut self)->u8{
+	fn get_reg_l(&self) -> u8 {
 		self.regs_hl.get_lo()
 	}
 
@@ -234,17 +255,11 @@ Flags:
 			_ => 0,
 		}
 	}
-
-	//fn dec
-	/*fn get_reg_l(&mut self)->u8{
-		self.regs_hl.get_lo()
-	}*/
 }
 
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::gb::cartridge::Cartridge;
 
 	fn create_test_interconnect() -> Interconnect {
 		// Create a minimal ROM for testing
