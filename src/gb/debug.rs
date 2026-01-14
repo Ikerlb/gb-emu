@@ -30,7 +30,7 @@ impl DebugConfig {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MemoryRange {
     pub start: u16,
     pub end: u16,
