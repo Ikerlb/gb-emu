@@ -2,7 +2,7 @@ mod gb;
 
 use clap::Parser;
 use gb::debug::{DebugConfig, MemoryRange, format_memory_dump};
-use gb::debugger::Debugger;
+use gb::debugger;
 use gb::gameboy::*;
 use std::fs::File;
 use std::io::Read;
@@ -50,10 +50,9 @@ fn main() {
     let mut gb = GameBoy::new(file_buf, debug_config);
 
     if args.interactive {
-        // Run interactive debugger
-        match Debugger::new() {
-            Ok(mut debugger) => debugger.run(&mut gb),
-            Err(e) => eprintln!("Failed to start debugger: {}", e),
+        // Run TUI debugger
+        if let Err(e) = debugger::run(&mut gb) {
+            eprintln!("Debugger error: {}", e);
         }
     } else {
         // Normal execution
