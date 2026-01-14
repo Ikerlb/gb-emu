@@ -132,7 +132,8 @@ pub fn format_memory_dump(interconnect: &Interconnect, range: MemoryRange) -> St
             let hex_part = format_hex_line(&bytes);
             let ascii_part: String = bytes.iter().map(ByteRead::as_ascii).collect();
 
-            format!("{:04X}  {} |{}|", line_addr, hex_part, ascii_part)
+            // Use box-drawing character for visual separation
+            format!("{:04X} │ {} │ {}", line_addr, hex_part, ascii_part)
         })
         .collect::<Vec<_>>()
         .join("\n") + "\n"

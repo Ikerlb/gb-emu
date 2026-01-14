@@ -93,10 +93,15 @@ This phase is critical for efficient development. Without good debugging tools, 
 2. Add log statements throughout codebase
 3. Create instruction trace mode
 
-**Phase 2E: Advanced Features (Optional, 1-2 days)**
-1. TUI (Terminal UI) using `ratatui` for better visualization
-2. Save/load state functionality
-3. Compare with reference implementation
+**Phase 2E: TUI Debugger (1-2 days)** ✅ COMPLETED
+1. ✅ TUI (Terminal UI) using `ratatui` for better visualization
+2. ✅ Scrollable memory viewer with responsive width
+3. ✅ Focus system (Tab to switch panels, mouse scroll support)
+4. ✅ Memory range highlighting via `mem` command
+5. ✅ Command history with Up/Down arrows
+6. ✅ Clickable registers with detailed modal (Dec/Hex/Bin, Hi/Lo bytes)
+7. Save/load state functionality (deferred)
+8. Compare with reference implementation (deferred)
 
 ### Benefits
 
@@ -585,21 +590,21 @@ This approach prioritizes **visible progress** AND **developer efficiency** - yo
 
 ## Current Priority
 
-**Phase 2A-C Complete! ✅** Debug infrastructure is fully in place.
+**Phase 2A-C + 2E(TUI) Complete! ✅** Debug infrastructure is fully in place.
 
 **What's been done:**
 - ✅ `--debug` flag shows CPU state after each instruction
 - ✅ `--verbose` flag for multi-line debug format
 - ✅ `--max-instructions` flag for limiting execution
 - ✅ `--dump-mem` for hex memory dumps with ASCII
-- ✅ `--interactive` for full debugger REPL
-- ✅ Breakpoints, stepping, vi keybindings, tab completion, history
+- ✅ `--interactive` for full TUI debugger with ratatui
+- ✅ Breakpoints, stepping, vi keybindings, live state display
 
-**Next Phase: Phase 2D - Logging Infrastructure** ⬅️ **OPTIONAL**
-- Integrate `env_logger` or `tracing` crate
-- Per-component logging
+**Remaining Optional (Phase 2D/2E):**
+- Logging infrastructure (`env_logger` or `tracing`)
+- Save/load state functionality
 
-**Recommended Next Step:** Skip to Phase 3 (CPU Completion) or Phase 4 (Memory Map) - the debugger is ready to help track down issues!
+**Recommended Next Step:** Phase 3 (CPU Completion) or Phase 4 (Memory Map) - the TUI debugger is ready to help track down issues!
 
 **Alternative Path:**
 Phase 4 (Memory Map Completion) is quick and unblocks CPU testing. Currently only cartridge regions work; WRAM, HRAM, VRAM, OAM, and I/O registers still panic.

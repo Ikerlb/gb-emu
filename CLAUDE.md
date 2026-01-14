@@ -64,11 +64,30 @@ GameBoy (orchestrator)
 - **`src/gb/interconnect.rs`** - Memory bus routing to appropriate hardware components
 - **`src/gb/cartridge.rs`** - ROM loading, RAM allocation, and Memory Bank Controller (MBC0, MBC1 implemented; MBC2, MBC3 stubbed)
 - **`src/gb/debug.rs`** - Debug configuration (DebugConfig struct with CLI flag settings)
-- **`src/gb/debugger.rs`** - Interactive debugger with REPL, breakpoints, vi keybindings
+- **`src/gb/debugger/`** - TUI debugger module
+  - `core.rs` - Command parsing, breakpoint manager
+  - `tui.rs` - Terminal UI using ratatui
 
-### Interactive Debugger
+### Interactive TUI Debugger
 
-Run with `--interactive` or `-i` to enter the debugger. Commands:
+Run with `--interactive` or `-i` to enter the TUI debugger. The interface shows all state at once:
+
+```
+┌─ Registers ─────────────────┐┌─ Flags ─────┐
+│ PC:0100  SP:FFFE            ││ Z:1  N:0    │
+│ AF:01B0  BC:0013            ││ H:1  C:0    │
+│ DE:00D8  HL:014D            │└─────────────┘
+└─────────────────────────────┘┌─ Breakpoints ┐
+┌─ Memory 0x0100-0x017F ──────┐│ 0: 0x0150    │
+│ 0100 │ 00 C3 50 01 ... │ ..│└──────────────┘
+│ 0110 │ 00 0C 00 0D ... │ ..│
+└─────────────────────────────┘
+┌─ Stepped to 0x0101 ─────────────────────────┐
+│ >                                           │
+└─────────────────────────────────────────────┘
+```
+
+**Commands:**
 
 | Command | Alias | Description |
 |---------|-------|-------------|
@@ -78,11 +97,17 @@ Run with `--interactive` or `-i` to enter the debugger. Commands:
 | `delete <id>` | `d` | Remove breakpoint by ID |
 | `list` | `l` | Show all breakpoints |
 | `reg` | `r` | Show CPU registers |
-| `mem <range>` | `m` | Dump memory (e.g., `m 0x0000:0x00FF`) |
+| `mem <range>` | `m` | Scroll to and highlight memory (e.g., `m 0x0100:0x01FF`) |
 | `help` | `h` | Show help |
 | `quit` | `q` | Exit |
 
-Features: Vi keybindings (ESC for normal mode), tab completion, command hints, persistent history (~/.gb_emu_history), empty Enter repeats last command.
+**Navigation:**
+- Tab to switch focus between Command and Memory panels
+- Up/Down arrows for command history (when Command focused) or scroll (when Memory focused)
+- Mouse scroll wheel to navigate memory (when Memory focused)
+- Click on any register value to see detailed modal (Dec/Hex/Bin + Hi/Lo bytes)
+- Enter on empty line repeats last command
+- Ctrl+C to quit
 
 ### Memory Map Status
 
