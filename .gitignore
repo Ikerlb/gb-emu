@@ -16,3 +16,7 @@
 # OS files
 .DS_Store
 Thumbs.db
+
+\#Cargo.toml\#
+Tetris_World.gb
+.claude
