@@ -84,7 +84,6 @@ pub fn parse_address(s: &str) -> Result<u16, String> {
 /// Represents a byte read result for hex dump formatting
 enum ByteRead {
     OutOfRange,
-    Unimplemented,
     Value(u8),
 }
 
@@ -93,7 +92,6 @@ impl ByteRead {
     fn write_hex(&self, buf: &mut String) {
         match self {
             ByteRead::Value(b) => write!(buf, "{:02X}", b).unwrap(),
-            ByteRead::Unimplemented => buf.push_str("??"),
             ByteRead::OutOfRange => buf.push_str("  "),
         }
     }
@@ -103,7 +101,6 @@ impl ByteRead {
         match self {
             ByteRead::Value(b) if (0x20..=0x7E).contains(b) => *b as char,
             ByteRead::Value(_) => '.',
-            ByteRead::Unimplemented => '?',
             ByteRead::OutOfRange => ' ',
         }
     }
@@ -122,9 +119,7 @@ pub fn format_memory_dump(interconnect: &Interconnect, range: MemoryRange) -> St
                     if !range.contains(addr) {
                         ByteRead::OutOfRange
                     } else {
-                        interconnect
-                            .try_read(addr)
-                            .map_or(ByteRead::Unimplemented, ByteRead::Value)
+                        ByteRead::Value(interconnect.read(addr))
                     }
                 })
                 .collect();

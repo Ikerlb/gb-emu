@@ -508,10 +508,7 @@ fn render_memory(
         // Hex bytes
         for i in 0..bytes_per_line {
             let addr = line_addr.saturating_add(i);
-            let byte_str = gb.interconnect()
-                .try_read(addr)
-                .map(|b| format!("{:02X}", b))
-                .unwrap_or_else(|| "??".to_string());
+            let byte_str = format!("{:02X}", gb.interconnect().read(addr));
 
             let is_highlighted = highlight
                 .as_ref()
@@ -535,16 +532,8 @@ fn render_memory(
         // ASCII representation
         for i in 0..bytes_per_line {
             let addr = line_addr.saturating_add(i);
-            let ascii_char = gb.interconnect()
-                .try_read(addr)
-                .map(|b| {
-                    if (0x20..=0x7E).contains(&b) {
-                        b as char
-                    } else {
-                        '.'
-                    }
-                })
-                .unwrap_or('?');
+            let b = gb.interconnect().read(addr);
+            let ascii_char = if (0x20..=0x7E).contains(&b) { b as char } else { '.' };
 
             let is_highlighted = highlight
                 .as_ref()
