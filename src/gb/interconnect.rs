@@ -1,12 +1,14 @@
 use crate::gb::mbc::Cartridge;
+use crate::gb::ppu::Ppu;
 
 
 pub struct Interconnect {
     cartridge: Cartridge,
+    ppu: Ppu,
     vram: Vec<u8>,         // 0x8000-0x9FFF (8KB)
     wram: Vec<u8>,         // 0xC000-0xDFFF (8KB)
     oam: Vec<u8>,          // 0xFE00-0xFE9F (160 bytes)
-    io_registers: Vec<u8>, // 0xFF00-0xFF7F (128 bytes)
+    io_registers: Vec<u8>, // 0xFF00-0xFF7F (128 bytes, but some routed to PPU)
     hram: Vec<u8>,         // 0xFF80-0xFFFE (127 bytes)
     ie_register: u8,       // 0xFFFF (1 byte)
 }
@@ -15,6 +17,7 @@ impl Interconnect {
     pub fn new(cart: Vec<u8>) -> Self {
         Interconnect {
             cartridge: Cartridge::new(cart),
+            ppu: Ppu::new(),
             vram: vec![0; 0x2000],         // 8KB initialized to 0
             wram: vec![0; 0x2000],         // 8KB initialized to 0
             oam: vec![0; 160],             // 160 bytes initialized to 0
@@ -22,6 +25,11 @@ impl Interconnect {
             hram: vec![0; 127],            // 127 bytes initialized to 0
             ie_register: 0,                // 1 byte initialized to 0
         }
+    }
+
+    /// Advance the PPU by the given number of T-cycles
+    pub fn step_ppu(&mut self, cycles: u32) {
+        self.ppu.step(cycles);
     }
 
     /// Reads 8 bits from the given address
@@ -41,8 +49,10 @@ impl Interconnect {
             0xFE00..=0xFE9F => self.oam[(address - 0xFE00) as usize],
             // Unusable region
             0xFEA0..=0xFEFF => 0xFF,
-            // I/O Registers
-            0xFF00..=0xFF7F => self.io_registers[(address - 0xFF00) as usize],
+            // PPU registers
+            0xFF40..=0xFF4B => self.ppu.read(address),
+            // Other I/O registers
+            0xFF00..=0xFF3F | 0xFF4C..=0xFF7F => self.io_registers[(address - 0xFF00) as usize],
             // HRAM
             0xFF80..=0xFFFE => self.hram[(address - 0xFF80) as usize],
             // IE Register
@@ -50,9 +60,17 @@ impl Interconnect {
         }
     }
 
-    //reads 16bits
-    pub fn read_16bits(&self,address:u16)->u16{
-        (self.read(address) as u16) << 8 | (self.read(address+1) as u16)
+    /// Reads 16 bits from the given address (little-endian: low byte first)
+    pub fn read_16bits(&self, address: u16) -> u16 {
+        let lo = self.read(address) as u16;
+        let hi = self.read(address.wrapping_add(1)) as u16;
+        (hi << 8) | lo
+    }
+
+    /// Writes 16 bits to the given address (little-endian: low byte first)
+    pub fn write_16bits(&mut self, address: u16, value: u16) {
+        self.write(address, value as u8);
+        self.write(address.wrapping_add(1), (value >> 8) as u8);
     }
 
     /// Writes 8 bits to the given address
@@ -72,8 +90,10 @@ impl Interconnect {
             0xFE00..=0xFE9F => self.oam[(address - 0xFE00) as usize] = data,
             // Unusable region - writes ignored
             0xFEA0..=0xFEFF => { /* ignored */ }
-            // I/O Registers
-            0xFF00..=0xFF7F => self.io_registers[(address - 0xFF00) as usize] = data,
+            // PPU registers
+            0xFF40..=0xFF4B => self.ppu.write(address, data),
+            // Other I/O registers
+            0xFF00..=0xFF3F | 0xFF4C..=0xFF7F => self.io_registers[(address - 0xFF00) as usize] = data,
             // HRAM
             0xFF80..=0xFFFE => self.hram[(address - 0xFF80) as usize] = data,
             // IE Register
@@ -129,25 +149,25 @@ mod tests {
     #[test]
     fn test_read_16bits() {
         let mut rom = create_test_rom();
-        rom[0x0200] = 0x34;
-        rom[0x0201] = 0x12;
+        rom[0x0200] = 0x34; // Low byte
+        rom[0x0201] = 0x12; // High byte
 
         let inter = Interconnect::new(rom);
 
-        // Read 16-bit value (little-endian)
+        // Read 16-bit value (little-endian: low byte at lower address)
         let value = inter.read_16bits(0x0200);
-        assert_eq!(value, 0x3412);
+        assert_eq!(value, 0x1234);
     }
 
     #[test]
     fn test_read_16bits_boundary() {
         let mut rom = create_test_rom();
-        rom[0x0000] = 0xFF;
-        rom[0x0001] = 0x00;
+        rom[0x0000] = 0xFF; // Low byte
+        rom[0x0001] = 0x00; // High byte
 
         let inter = Interconnect::new(rom);
         let value = inter.read_16bits(0x0000);
-        assert_eq!(value, 0xFF00);
+        assert_eq!(value, 0x00FF);
     }
 
     #[test]
