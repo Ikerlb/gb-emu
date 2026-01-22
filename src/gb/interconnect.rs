@@ -1,4 +1,4 @@
-use crate::gb::cartridge::Cartridge;
+use crate::gb::mbc::Cartridge;
 
 
 pub struct Interconnect{
