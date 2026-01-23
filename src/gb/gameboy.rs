@@ -47,9 +47,12 @@ impl GameBoy {
             let opcode_byte = self.interconnect.read(pc_before);
             let opcode = Opcode::from_u8(opcode_byte);
 
-            // Execute instruction
-            self.cpu.execute_next_opcode(&mut self.interconnect);
+            // Execute instruction and get cycle count
+            let cycles = self.cpu.execute_next_opcode(&mut self.interconnect);
             self.instruction_count += 1;
+
+            // Step PPU by the same number of cycles
+            self.interconnect.step_ppu(cycles as u32);
 
             // Debug output (only if enabled)
             if self.debug_config.enabled {
@@ -60,8 +63,10 @@ impl GameBoy {
 
     /// Execute a single instruction. Returns true if CPU is halted.
     pub fn step(&mut self) -> bool {
-        self.cpu.execute_next_opcode(&mut self.interconnect);
+        let cycles = self.cpu.execute_next_opcode(&mut self.interconnect);
         self.instruction_count += 1;
+        // Step PPU by the same number of cycles
+        self.interconnect.step_ppu(cycles as u32);
         // TODO: Return actual halt state when HALT opcode is implemented
         false
     }

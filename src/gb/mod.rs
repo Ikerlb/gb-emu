@@ -7,3 +7,4 @@ pub mod register;
 pub mod debug;
 pub mod debugger;
 pub mod mbc;
+pub mod ppu;
