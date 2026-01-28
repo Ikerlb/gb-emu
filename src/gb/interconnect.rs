@@ -1,16 +1,27 @@
 use crate::gb::mbc::Cartridge;
 use crate::gb::ppu::Ppu;
+use crate::gb::timer::Timer;
+use crate::gb::joypad::{Joypad, Button};
 
+/// Interrupt flag bits
+pub const INT_VBLANK: u8 = 0x01;  // Bit 0: V-Blank
+pub const INT_STAT: u8 = 0x02;    // Bit 1: LCD STAT
+pub const INT_TIMER: u8 = 0x04;   // Bit 2: Timer
+pub const INT_SERIAL: u8 = 0x08;  // Bit 3: Serial
+pub const INT_JOYPAD: u8 = 0x10;  // Bit 4: Joypad
 
 pub struct Interconnect {
     cartridge: Cartridge,
     ppu: Ppu,
+    timer: Timer,
+    joypad: Joypad,
     vram: Vec<u8>,         // 0x8000-0x9FFF (8KB)
     wram: Vec<u8>,         // 0xC000-0xDFFF (8KB)
     oam: Vec<u8>,          // 0xFE00-0xFE9F (160 bytes)
-    io_registers: Vec<u8>, // 0xFF00-0xFF7F (128 bytes, but some routed to PPU)
+    io_registers: Vec<u8>, // 0xFF00-0xFF7F (128 bytes, but some routed to PPU/Timer/Joypad)
     hram: Vec<u8>,         // 0xFF80-0xFFFE (127 bytes)
-    ie_register: u8,       // 0xFFFF (1 byte)
+    ie_register: u8,       // 0xFFFF - Interrupt Enable
+    if_register: u8,       // 0xFF0F - Interrupt Flags
 }
 
 impl Interconnect {
@@ -18,18 +29,101 @@ impl Interconnect {
         Interconnect {
             cartridge: Cartridge::new(cart),
             ppu: Ppu::new(),
+            timer: Timer::new(),
+            joypad: Joypad::new(),
             vram: vec![0; 0x2000],         // 8KB initialized to 0
             wram: vec![0; 0x2000],         // 8KB initialized to 0
             oam: vec![0; 160],             // 160 bytes initialized to 0
             io_registers: vec![0xFF; 128], // 128 bytes stubbed to 0xFF
             hram: vec![0; 127],            // 127 bytes initialized to 0
-            ie_register: 0,                // 1 byte initialized to 0
+            ie_register: 0,                // Interrupt Enable
+            if_register: 0xE0,             // Interrupt Flags (upper bits always 1)
         }
     }
 
-    /// Advance the PPU by the given number of T-cycles
+    /// Advance the PPU and Timer by the given number of T-cycles
+    pub fn step(&mut self, cycles: u32) {
+        // Step PPU (returns true if VBlank was just entered)
+        let entered_vblank = self.ppu.step(cycles, &self.vram, &self.oam);
+
+        // Step Timer
+        self.timer.step(cycles);
+
+        // Check for timer interrupt
+        if self.timer.interrupt_requested {
+            self.if_register |= INT_TIMER;
+            self.timer.clear_interrupt();
+        }
+
+        // Request VBlank interrupt only when entering VBlank (not continuously)
+        if entered_vblank {
+            self.if_register |= INT_VBLANK;
+        }
+    }
+
+    /// Legacy method - calls step()
     pub fn step_ppu(&mut self, cycles: u32) {
-        self.ppu.step(cycles);
+        self.step(cycles);
+    }
+
+    /// Get pending interrupts (IF & IE)
+    pub fn pending_interrupts(&self) -> u8 {
+        self.if_register & self.ie_register & 0x1F
+    }
+
+    /// Clear a specific interrupt flag
+    pub fn clear_interrupt(&mut self, interrupt: u8) {
+        self.if_register &= !interrupt;
+    }
+
+    /// Request an interrupt
+    pub fn request_interrupt(&mut self, interrupt: u8) {
+        self.if_register |= interrupt;
+    }
+
+    /// Get IE register
+    pub fn ie(&self) -> u8 {
+        self.ie_register
+    }
+
+    /// Get IF register
+    pub fn if_reg(&self) -> u8 {
+        self.if_register | 0xE0 // Upper 3 bits always read as 1
+    }
+
+    /// Check if a new frame is ready for display
+    pub fn frame_ready(&self) -> bool {
+        self.ppu.frame_ready
+    }
+
+    /// Get a reference to the framebuffer
+    pub fn framebuffer(&self) -> &[u32] {
+        &self.ppu.framebuffer
+    }
+
+    /// Clear the frame_ready flag after displaying
+    pub fn clear_frame_ready(&mut self) {
+        self.ppu.frame_ready = false;
+    }
+
+    /// Press a joypad button
+    pub fn press_button(&mut self, button: Button) {
+        self.joypad.press(button);
+    }
+
+    /// Release a joypad button
+    pub fn release_button(&mut self, button: Button) {
+        self.joypad.release(button);
+    }
+
+    /// Perform OAM DMA transfer
+    /// Copies 160 bytes from source (data << 8) to OAM (0xFE00-0xFE9F)
+    fn oam_dma(&mut self, data: u8) {
+        let source = (data as u16) << 8;
+        for i in 0..160u16 {
+            let byte = self.read(source + i);
+            self.oam[i as usize] = byte;
+        }
     }
 
     /// Reads 8 bits from the given address
@@ -49,10 +143,20 @@ impl Interconnect {
             0xFE00..=0xFE9F => self.oam[(address - 0xFE00) as usize],
             // Unusable region
             0xFEA0..=0xFEFF => 0xFF,
-            // PPU registers
-            0xFF40..=0xFF4B => self.ppu.read(address),
+            // Joypad register
+            0xFF00 => self.joypad.read(),
+            // Timer registers
+            0xFF04..=0xFF07 => self.timer.read(address),
+            // IF - Interrupt Flags
+            0xFF0F => self.if_register | 0xE0,
+            // OAM DMA register (returns 0xFF, write-only effectively)
+            0xFF46 => 0xFF,
+            // PPU registers (excluding DMA at 0xFF46)
+            0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.read(address),
             // Other I/O registers
-            0xFF00..=0xFF3F | 0xFF4C..=0xFF7F => self.io_registers[(address - 0xFF00) as usize],
+            0xFF01..=0xFF03 | 0xFF08..=0xFF0E | 0xFF10..=0xFF3F | 0xFF4C..=0xFF7F => {
+                self.io_registers[(address - 0xFF00) as usize]
+            }
             // HRAM
             0xFF80..=0xFFFE => self.hram[(address - 0xFF80) as usize],
             // IE Register
@@ -90,10 +194,20 @@ impl Interconnect {
             0xFE00..=0xFE9F => self.oam[(address - 0xFE00) as usize] = data,
             // Unusable region - writes ignored
             0xFEA0..=0xFEFF => { /* ignored */ }
-            // PPU registers
-            0xFF40..=0xFF4B => self.ppu.write(address, data),
+            // Joypad register
+            0xFF00 => self.joypad.write(data),
+            // Timer registers
+            0xFF04..=0xFF07 => self.timer.write(address, data),
+            // IF - Interrupt Flags
+            0xFF0F => self.if_register = data | 0xE0,
+            // OAM DMA transfer
+            0xFF46 => self.oam_dma(data),
+            // PPU registers (excluding DMA at 0xFF46)
+            0xFF40..=0xFF45 | 0xFF47..=0xFF4B => self.ppu.write(address, data),
             // Other I/O registers
-            0xFF00..=0xFF3F | 0xFF4C..=0xFF7F => self.io_registers[(address - 0xFF00) as usize] = data,
+            0xFF01..=0xFF03 | 0xFF08..=0xFF0E | 0xFF10..=0xFF3F | 0xFF4C..=0xFF7F => {
+                self.io_registers[(address - 0xFF00) as usize] = data
+            }
             // HRAM
             0xFF80..=0xFFFE => self.hram[(address - 0xFF80) as usize] = data,
             // IE Register
@@ -257,15 +371,31 @@ mod tests {
         let rom = create_test_rom();
         let mut inter = Interconnect::new(rom);
 
-        // I/O registers initially 0xFF (stub)
-        assert_eq!(inter.read(0xFF00), 0xFF);
+        // Stubbed I/O registers initially 0xFF
+        // Note: 0xFF00 is joypad (handled specially), use 0xFF01 for stub test
+        assert_eq!(inter.read(0xFF01), 0xFF);
         assert_eq!(inter.read(0xFF7F), 0xFF);
 
         // Can write and read back
-        inter.write(0xFF00, 0x00);
+        inter.write(0xFF01, 0x00);
         inter.write(0xFF7F, 0x12);
-        assert_eq!(inter.read(0xFF00), 0x00);
+        assert_eq!(inter.read(0xFF01), 0x00);
         assert_eq!(inter.read(0xFF7F), 0x12);
+    }
+
+    #[test]
+    fn test_joypad_register() {
+        let rom = create_test_rom();
+        let mut inter = Interconnect::new(rom);
+
+        // Joypad initially returns 0xFF (neither selection active, all buttons read high)
+        // Bits 6-7 = 1, bits 4-5 = 1 (neither selected), bits 0-3 = 1
+        assert_eq!(inter.read(0xFF00), 0xFF);
+
+        // Select direction buttons (bit 4 = 0)
+        inter.write(0xFF00, 0x20);
+        // Should read 0xEF (bit 4=0 for directions selected, all buttons released)
+        assert_eq!(inter.read(0xFF00) & 0x3F, 0x2F);
     }
 
     #[test]

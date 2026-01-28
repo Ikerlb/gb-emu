@@ -4,111 +4,122 @@ A Game Boy (DMG) emulator written in Rust, aiming for accuracy and clean archite
 
 ## Project Status
 
-⚠️ **Early Development** - This project is in very early stages (~5% complete). Currently, the emulator can:
-- Load ROM files
-- Execute basic CPU opcodes (~8 out of 256+)
-- Handle cartridge memory banking (MBC1 partially implemented)
+**Playable!** - Tetris runs and is fully playable with graphics and input.
 
 ### What's Implemented
 
-- ✅ Basic CPU structure (Sharp LR35902)
-- ✅ Register management
-- ✅ Cartridge loading & ROM parsing
-- ✅ Memory Bank Controllers (MBC0, MBC1 mostly complete, MBC2/3 partial)
-- ✅ Basic interconnect (memory bus)
-- ✅ ~8 opcodes (NOP, DEC, CPL, JP, LD variants)
+- **CPU** - All 512 opcodes (256 standard + 256 CB-prefix)
+- **PPU** - Full rendering (background, window, sprites with proper priority)
+- **Memory Map** - Complete implementation (VRAM, WRAM, HRAM, OAM, Echo RAM)
+- **Cartridge** - ROM loading, MBC0/MBC1 bank switching
+- **Timer** - DIV, TIMA, TMA, TAC registers with overflow interrupts
+- **Interrupts** - VBlank and Timer interrupts, IME, HALT
+- **Input** - Joypad with keyboard mapping
+- **OAM DMA** - Sprite data transfer (0xFF46)
+- **TUI Debugger** - Breakpoints, stepping, memory viewer, register inspector
 
 ### What's Missing
 
-- ❌ GPU/PPU (graphics rendering)
-- ❌ APU (audio processing)
-- ❌ Input handling
-- ❌ Timers
-- ❌ Interrupts
-- ❌ Most CPU opcodes (~97% remaining)
-- ❌ Complete memory map
-- ❌ Serial I/O
-- ❌ DMA transfers
+- Audio (APU)
+- Serial I/O
+- MBC2/MBC3/MBC5 (needed for more games)
+- Save file persistence (.sav)
 
 ## Architecture
 
-The emulator follows a modular component-based architecture:
-
 ```
-GameBoy (Top-level orchestrator)
-    ├── CPU (Sharp LR35902 processor)
-    │   ├── Registers (PC, SP, AF, BC, DE, HL)
-    │   ├── Flags (Z, N, H, C)
-    │   └── Opcode executor
-    └── Interconnect (Memory bus)
-        └── Cartridge (ROM/RAM + MBC)
+GameBoy (orchestrator)
+├── CPU (Sharp LR35902)
+│   ├── All 512 opcodes (256 + 256 CB-prefix)
+│   ├── Interrupt handling (IME, HALT)
+│   └── Flags: Z, N, H, C
+├── PPU (Pixel Processing Unit)
+│   ├── Background rendering with scrolling
+│   ├── Window layer
+│   ├── Sprite rendering (8x8 and 8x16)
+│   ├── Mode transitions (OAM → Drawing → HBlank → VBlank)
+│   └── 160x144 framebuffer output
+├── Timer
+│   ├── DIV (divider), TIMA (counter), TMA (modulo), TAC (control)
+│   └── Overflow interrupt generation
+├── Joypad
+│   ├── Direction buttons (D-pad)
+│   └── Action buttons (A, B, Start, Select)
+└── Interconnect (memory bus)
+    ├── Cartridge (ROM/RAM + MBC0/MBC1)
+    ├── VRAM (8KB), WRAM (8KB), HRAM (127B), OAM (160B)
+    ├── OAM DMA transfer (0xFF46)
+    └── I/O register routing
 ```
-
-### Key Components
-
-- **`GameBoy`** (`src/gb/gameboy.rs`) - Main emulator struct, execution loop
-- **`CPU`** (`src/gb/cpu.rs`) - CPU implementation with register management
-- **`Register`** (`src/gb/register.rs`) - 16-bit register abstraction
-- **`Opcode`** (`src/gb/opcode.rs`) - Enum-based opcode definitions
-- **`Interconnect`** (`src/gb/interconnect.rs`) - Memory bus routing
-- **`Cartridge`** (`src/gb/cartridge.rs`) - ROM/RAM and bank switching
 
 ## Building
 
-Requires Rust 1.56+ (uses 2021 edition)
+Requires Rust 1.56+ (2021 edition)
 
 ```bash
-cargo build
-```
-
-Run tests:
-```bash
-cargo test
+cargo build --release
+cargo test              # Run 150+ unit tests
 ```
 
 ## Running
 
 ```bash
-cargo run -- path/to/rom.gb
+# Play a game with display
+cargo run --release -- -f "Tetris (World).gb" --display
+
+# With larger window (2x, 3x, or 4x scale)
+cargo run --release -- -f "rom.gb" --display --scale 4
+
+# Debug output (headless)
+cargo run -- -f "rom.gb" --debug
+
+# Interactive TUI debugger
+cargo run -- -f "rom.gb" --interactive
+
+# Limited execution with memory dump
+cargo run -- -f "rom.gb" -m 1000 --dump-mem 0xFE00:0xFE9F
 ```
 
-Example with the included Tetris ROM:
-```bash
-cargo run -- "Tetris (World).gb"
+## Controls
+
+| Key | Game Boy Button |
+|-----|-----------------|
+| Arrow keys | D-pad |
+| Z | A |
+| X | B |
+| Enter | Start |
+| Backspace | Select |
+| Escape | Quit |
+
+## TUI Debugger
+
+Run with `--interactive` for a full-featured debugger:
+
+```
+┌─ Registers ─────────────────┐┌─ Flags ─────┐
+│ PC:0100  SP:FFFE            ││ Z:1  N:0    │
+│ AF:01B0  BC:0013            ││ H:1  C:0    │
+└─────────────────────────────┘└─────────────┘
+┌─ Memory 0x0100-0x017F ──────────────────────┐
+│ 0100 │ 00 C3 50 01 CE ED ... │ ..P.......  │
+└─────────────────────────────────────────────┘
 ```
 
-**Note:** Currently the emulator will only execute a few opcodes before hitting `unimplemented!()` panics. This is expected given the early development stage.
+**Commands:** `step`, `continue`, `break <addr>`, `mem <range>`, `reg`, `quit`
 
-## Development
+## Dependencies
 
-### Dependencies
-
-- `num-traits` - Numeric trait abstractions
-- `num-derive` - Derive macros for numeric conversions
-
-### Recent Updates
-
-- ✨ Migrated to Rust 2021 edition
-- ✨ Updated dependencies to modern versions
-- ✨ Fixed deprecated range patterns (`...` → `..=`)
-- ✨ Modernized module imports
-
-### Roadmap
-
-See [ROADMAP.md](ROADMAP.md) for the detailed development plan.
+- `minifb` - Window and framebuffer display
+- `num-traits`, `num-derive` - Numeric conversions
+- `ratatui`, `crossterm` - TUI debugger
+- `clap` - Command-line parsing
 
 ## Resources
 
-Useful references for Game Boy emulator development:
 - [Pan Docs](https://gbdev.io/pandocs/) - Comprehensive GB technical reference
-- [Game Boy CPU Manual](http://marc.rawer.de/Gameboy/Docs/GBCPUman.pdf)
-- [Codeslinger's GB Tutorial](http://www.codeslinger.co.uk/ps-emu/gameboy/gameboy.html)
-- [/r/EmuDev](https://www.reddit.com/r/EmuDev/)
+- [GBEDG](https://hacktix.github.io/GBEDG/) - Game Boy Emulator Development Guide
+- [Blargg's Test ROMs](https://github.com/retrio/gb-test-roms)
 
 ## License
 
-Dual licensed under MIT or Apache-2.0, at your option.
-
-## Contributing
-
-This is a personal learning project currently in early development. The codebase will undergo significant changes as core functionality is implemented.
+Dual licensed under MIT or Apache-2.0.

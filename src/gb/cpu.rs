@@ -113,6 +113,13 @@ pub struct Cpu {
     regs_hl: Register, // HL Register
 
     flags: Flags,
+
+    /// Interrupt Master Enable - when true, interrupts can be serviced
+    ime: bool,
+    /// Pending IME enable - EI sets this, IME is enabled after next instruction
+    ime_pending: bool,
+    /// CPU is halted, waiting for interrupt
+    halted: bool,
 }
 
 #[derive(Debug)]
@@ -465,6 +472,204 @@ Flags:
 		self.flags.c = a < value;
 	}
 
+	// ========== CB-prefix operations ==========
+
+	/// RLC - Rotate left, old bit 7 to carry. Z=*, N=0, H=0, C=*
+	fn cb_rlc(&mut self, value: u8) -> u8 {
+		let carry = (value >> 7) & 1;
+		let result = (value << 1) | carry;
+		self.flags.z = result == 0;
+		self.flags.n = false;
+		self.flags.h = false;
+		self.flags.c = carry == 1;
+		result
+	}
+
+	/// RRC - Rotate right, old bit 0 to carry. Z=*, N=0, H=0, C=*
+	fn cb_rrc(&mut self, value: u8) -> u8 {
+		let carry = value & 1;
+		let result = (value >> 1) | (carry << 7);
+		self.flags.z = result == 0;
+		self.flags.n = false;
+		self.flags.h = false;
+		self.flags.c = carry == 1;
+		result
+	}
+
+	/// RL - Rotate left through carry. Z=*, N=0, H=0, C=*
+	fn cb_rl(&mut self, value: u8) -> u8 {
+		let old_carry = if self.flags.c { 1 } else { 0 };
+		let new_carry = (value >> 7) & 1;
+		let result = (value << 1) | old_carry;
+		self.flags.z = result == 0;
+		self.flags.n = false;
+		self.flags.h = false;
+		self.flags.c = new_carry == 1;
+		result
+	}
+
+	/// RR - Rotate right through carry. Z=*, N=0, H=0, C=*
+	fn cb_rr(&mut self, value: u8) -> u8 {
+		let old_carry = if self.flags.c { 1u8 } else { 0 };
+		let new_carry = value & 1;
+		let result = (value >> 1) | (old_carry << 7);
+		self.flags.z = result == 0;
+		self.flags.n = false;
+		self.flags.h = false;
+		self.flags.c = new_carry == 1;
+		result
+	}
+
+	/// SLA - Shift left arithmetic (bit 0 = 0). Z=*, N=0, H=0, C=*
+	fn cb_sla(&mut self, value: u8) -> u8 {
+		let carry = (value >> 7) & 1;
+		let result = value << 1;
+		self.flags.z = result == 0;
+		self.flags.n = false;
+		self.flags.h = false;
+		self.flags.c = carry == 1;
+		result
+	}
+
+	/// SRA - Shift right arithmetic (bit 7 unchanged). Z=*, N=0, H=0, C=*
+	fn cb_sra(&mut self, value: u8) -> u8 {
+		let carry = value & 1;
+		let result = (value >> 1) | (value & 0x80); // Preserve bit 7
+		self.flags.z = result == 0;
+		self.flags.n = false;
+		self.flags.h = false;
+		self.flags.c = carry == 1;
+		result
+	}
+
+	/// SWAP - Swap upper and lower nibbles. Z=*, N=0, H=0, C=0
+	fn cb_swap(&mut self, value: u8) -> u8 {
+		let result = (value >> 4) | (value << 4);
+		self.flags.z = result == 0;
+		self.flags.n = false;
+		self.flags.h = false;
+		self.flags.c = false;
+		result
+	}
+
+	/// SRL - Shift right logical (bit 7 = 0). Z=*, N=0, H=0, C=*
+	fn cb_srl(&mut self, value: u8) -> u8 {
+		let carry = value & 1;
+		let result = value >> 1;
+		self.flags.z = result == 0;
+		self.flags.n = false;
+		self.flags.h = false;
+		self.flags.c = carry == 1;
+		result
+	}
+
+	/// BIT - Test bit n. Z=*, N=0, H=1, C=-
+	fn cb_bit(&mut self, bit: u8, value: u8) {
+		self.flags.z = (value & (1 << bit)) == 0;
+		self.flags.n = false;
+		self.flags.h = true;
+		// C flag unchanged
+	}
+
+	/// RES - Reset bit n. No flags affected.
+	fn cb_res(&self, bit: u8, value: u8) -> u8 {
+		value & !(1 << bit)
+	}
+
+	/// SET - Set bit n. No flags affected.
+	fn cb_set(&self, bit: u8, value: u8) -> u8 {
+		value | (1 << bit)
+	}
+
+	/// Execute CB-prefixed opcode, returns cycle count
+	fn execute_cb(&mut self, inter: &mut Interconnect) -> usize {
+		let cb_op = self.read_imm8(inter);
+		let reg = Reg8::from_bits(cb_op & 0x07);
+		let is_hl_ref = reg == Reg8::HLRef;
+
+		// Operations 0x40-0xFF use bits 5-3 as bit number
+		let bit = (cb_op >> 3) & 0x07;
+
+		match cb_op {
+			// RLC r (0x00-0x07)
+			0x00..=0x07 => {
+				let val = self.read_r8(inter, reg);
+				let result = self.cb_rlc(val);
+				self.write_r8(inter, reg, result);
+				if is_hl_ref { 16 } else { 8 }
+			}
+			// RRC r (0x08-0x0F)
+			0x08..=0x0F => {
+				let val = self.read_r8(inter, reg);
+				let result = self.cb_rrc(val);
+				self.write_r8(inter, reg, result);
+				if is_hl_ref { 16 } else { 8 }
+			}
+			// RL r (0x10-0x17)
+			0x10..=0x17 => {
+				let val = self.read_r8(inter, reg);
+				let result = self.cb_rl(val);
+				self.write_r8(inter, reg, result);
+				if is_hl_ref { 16 } else { 8 }
+			}
+			// RR r (0x18-0x1F)
+			0x18..=0x1F => {
+				let val = self.read_r8(inter, reg);
+				let result = self.cb_rr(val);
+				self.write_r8(inter, reg, result);
+				if is_hl_ref { 16 } else { 8 }
+			}
+			// SLA r (0x20-0x27)
+			0x20..=0x27 => {
+				let val = self.read_r8(inter, reg);
+				let result = self.cb_sla(val);
+				self.write_r8(inter, reg, result);
+				if is_hl_ref { 16 } else { 8 }
+			}
+			// SRA r (0x28-0x2F)
+			0x28..=0x2F => {
+				let val = self.read_r8(inter, reg);
+				let result = self.cb_sra(val);
+				self.write_r8(inter, reg, result);
+				if is_hl_ref { 16 } else { 8 }
+			}
+			// SWAP r (0x30-0x37)
+			0x30..=0x37 => {
+				let val = self.read_r8(inter, reg);
+				let result = self.cb_swap(val);
+				self.write_r8(inter, reg, result);
+				if is_hl_ref { 16 } else { 8 }
+			}
+			// SRL r (0x38-0x3F)
+			0x38..=0x3F => {
+				let val = self.read_r8(inter, reg);
+				let result = self.cb_srl(val);
+				self.write_r8(inter, reg, result);
+				if is_hl_ref { 16 } else { 8 }
+			}
+			// BIT n, r (0x40-0x7F)
+			0x40..=0x7F => {
+				let val = self.read_r8(inter, reg);
+				self.cb_bit(bit, val);
+				if is_hl_ref { 12 } else { 8 }
+			}
+			// RES n, r (0x80-0xBF)
+			0x80..=0xBF => {
+				let val = self.read_r8(inter, reg);
+				let result = self.cb_res(bit, val);
+				self.write_r8(inter, reg, result);
+				if is_hl_ref { 16 } else { 8 }
+			}
+			// SET n, r (0xC0-0xFF)
+			0xC0..=0xFF => {
+				let val = self.read_r8(inter, reg);
+				let result = self.cb_set(bit, val);
+				self.write_r8(inter, reg, result);
+				if is_hl_ref { 16 } else { 8 }
+			}
+		}
+	}
+
 	/// Read immediate 8-bit value and advance PC
 	fn read_imm8(&mut self, inter: &Interconnect) -> u8 {
 		let val = inter.read(self.reg_pc);
@@ -491,7 +696,70 @@ Flags:
 			regs_de: Register::new(0x00D8),
 			regs_hl: Register::new(0x014D),
 			flags: Flags { z: true, n: false, h: true, c: true }, // Match 0xB0 in F
+			ime: false,        // Interrupts disabled at startup
+			ime_pending: false,
+			halted: false,
 		}
+	}
+
+	/// Check if CPU is halted
+	pub fn is_halted(&self) -> bool {
+		self.halted
+	}
+
+	/// Get IME status
+	pub fn ime(&self) -> bool {
+		self.ime
+	}
+
+	/// Handle pending interrupts, returns cycles consumed (0 if no interrupt)
+	pub fn handle_interrupts(&mut self, inter: &mut Interconnect) -> usize {
+		// Process pending IME enable (from EI instruction)
+		if self.ime_pending {
+			self.ime_pending = false;
+			self.ime = true;
+		}
+
+		let pending = inter.pending_interrupts();
+
+		// If halted and there's a pending interrupt, wake up
+		if self.halted && pending != 0 {
+			self.halted = false;
+		}
+
+		// Only service interrupts if IME is enabled
+		if !self.ime || pending == 0 {
+			return 0;
+		}
+
+		// Service highest priority interrupt (lowest bit number)
+		// Priority: VBlank > STAT > Timer > Serial > Joypad
+		let (interrupt_bit, vector) = if pending & 0x01 != 0 {
+			(0x01, 0x0040) // V-Blank
+		} else if pending & 0x02 != 0 {
+			(0x02, 0x0048) // LCD STAT
+		} else if pending & 0x04 != 0 {
+			(0x04, 0x0050) // Timer
+		} else if pending & 0x08 != 0 {
+			(0x08, 0x0058) // Serial
+		} else {
+			(0x10, 0x0060) // Joypad
+		};
+
+		// Disable interrupts
+		self.ime = false;
+
+		// Clear the interrupt flag
+		inter.clear_interrupt(interrupt_bit);
+
+		// Push PC to stack
+		self.push_16(inter, self.reg_pc);
+
+		// Jump to interrupt vector
+		self.reg_pc = vector;
+
+		// Interrupt handling takes 20 cycles (5 M-cycles)
+		20
 	}
 
 	pub fn execute_next_opcode(&mut self,inter:&mut Interconnect)->usize{
@@ -972,7 +1240,10 @@ Flags:
 			Opcode::Ld_HLref_E => { inter.write(self.regs_hl.get(), self.get_reg_e()); 8 }
 			Opcode::Ld_HLref_H => { inter.write(self.regs_hl.get(), self.get_reg_h()); 8 }
 			Opcode::Ld_HLref_L => { inter.write(self.regs_hl.get(), self.get_reg_l()); 8 }
-			Opcode::Halt => 4, // TODO: Proper HALT implementation
+			Opcode::Halt => {
+				self.halted = true;
+				4
+			}
 			Opcode::Ld_HLref_A => { inter.write(self.regs_hl.get(), self.get_reg_a()); 8 }
 			Opcode::Ld_A_B => { self.set_reg_a(self.get_reg_b()); 4 }
 			Opcode::Ld_A_C => { self.set_reg_a(self.get_reg_c()); 4 }
@@ -1128,8 +1399,7 @@ Flags:
 				}
 			}
 			Opcode::Prefix_Cb => {
-				// CB prefix - not implemented yet
-				panic!("CB-prefix opcodes not yet implemented");
+				self.execute_cb(inter)
 			}
 			Opcode::Call_Z_a16 => {
 				let addr = self.read_imm16(inter);
@@ -1214,7 +1484,7 @@ Flags:
 				}
 			}
 			Opcode::Reti => {
-				// TODO: Enable interrupts
+				self.ime = true; // Enable interrupts immediately
 				self.reg_pc = self.pop_16(inter);
 				16
 			}
@@ -1330,7 +1600,8 @@ Flags:
 				8
 			}
 			Opcode::Di => {
-				// TODO: Disable interrupts
+				self.ime = false;
+				self.ime_pending = false;
 				4
 			}
 			Opcode::Push_Af => {
@@ -1373,7 +1644,8 @@ Flags:
 				16
 			}
 			Opcode::Ei => {
-				// TODO: Enable interrupts
+				// EI enables interrupts after the next instruction
+				self.ime_pending = true;
 				4
 			}
 			Opcode::Cp_A_d8 => {
@@ -2524,5 +2796,251 @@ mod tests {
 		assert_eq!(cycles, 20);
 		assert_eq!(inter.read(0xC000), 0x34); // Low byte
 		assert_eq!(inter.read(0xC001), 0x12); // High byte
+	}
+
+	// ========== CB-Prefix Opcode Tests ==========
+
+	#[test]
+	fn test_cb_rlc_b() {
+		let mut cpu = Cpu::new();
+		let mut inter = create_test_interconnect_with_rom(&[(0x0100, 0x00)]); // CB opcode for RLC B
+		cpu.reg_pc = 0x0100;
+		cpu.set_reg_b(0x85); // 1000_0101
+
+		let cycles = cpu.execute_opcode(&mut inter, 0xCB); // PREFIX CB
+
+		assert_eq!(cycles, 8);
+		assert_eq!(cpu.get_reg_b(), 0x0B); // 0000_1011 (rotated left, bit 7 -> bit 0)
+		assert!(cpu.flags.c); // Old bit 7 was 1
+		assert!(!cpu.flags.z);
+		assert!(!cpu.flags.n);
+		assert!(!cpu.flags.h);
+	}
+
+	#[test]
+	fn test_cb_rlc_zero() {
+		let mut cpu = Cpu::new();
+		let mut inter = create_test_interconnect_with_rom(&[(0x0100, 0x00)]); // RLC B
+		cpu.reg_pc = 0x0100;
+		cpu.set_reg_b(0x00);
+
+		cpu.execute_opcode(&mut inter, 0xCB);
+
+		assert_eq!(cpu.get_reg_b(), 0x00);
+		assert!(cpu.flags.z);
+		assert!(!cpu.flags.c);
+	}
+
+	#[test]
+	fn test_cb_rrc_a() {
+		let mut cpu = Cpu::new();
+		let mut inter = create_test_interconnect_with_rom(&[(0x0100, 0x0F)]); // RRC A
+		cpu.reg_pc = 0x0100;
+		cpu.set_reg_a(0x81); // 1000_0001
+
+		let cycles = cpu.execute_opcode(&mut inter, 0xCB);
+
+		assert_eq!(cycles, 8);
+		assert_eq!(cpu.get_reg_a(), 0xC0); // 1100_0000 (rotated right, bit 0 -> bit 7)
+		assert!(cpu.flags.c); // Old bit 0 was 1
+	}
+
+	#[test]
+	fn test_cb_rl_c() {
+		let mut cpu = Cpu::new();
+		let mut inter = create_test_interconnect_with_rom(&[(0x0100, 0x11)]); // RL C
+		cpu.reg_pc = 0x0100;
+		cpu.set_reg_c(0x80); // 1000_0000
+		cpu.flags.c = true; // Carry set
+
+		let cycles = cpu.execute_opcode(&mut inter, 0xCB);
+
+		assert_eq!(cycles, 8);
+		assert_eq!(cpu.get_reg_c(), 0x01); // 0000_0001 (shifted left, old carry -> bit 0)
+		assert!(cpu.flags.c); // Old bit 7 was 1
+	}
+
+	#[test]
+	fn test_cb_rr_d() {
+		let mut cpu = Cpu::new();
+		let mut inter = create_test_interconnect_with_rom(&[(0x0100, 0x1A)]); // RR D
+		cpu.reg_pc = 0x0100;
+		cpu.set_reg_d(0x01); // 0000_0001
+		cpu.flags.c = true; // Carry set
+
+		let cycles = cpu.execute_opcode(&mut inter, 0xCB);
+
+		assert_eq!(cycles, 8);
+		assert_eq!(cpu.get_reg_d(), 0x80); // 1000_0000 (shifted right, old carry -> bit 7)
+		assert!(cpu.flags.c); // Old bit 0 was 1
+	}
+
+	#[test]
+	fn test_cb_sla_e() {
+		let mut cpu = Cpu::new();
+		let mut inter = create_test_interconnect_with_rom(&[(0x0100, 0x23)]); // SLA E
+		cpu.reg_pc = 0x0100;
+		cpu.set_reg_e(0xC1); // 1100_0001
+
+		let cycles = cpu.execute_opcode(&mut inter, 0xCB);
+
+		assert_eq!(cycles, 8);
+		assert_eq!(cpu.get_reg_e(), 0x82); // 1000_0010 (shifted left, bit 0 = 0)
+		assert!(cpu.flags.c); // Old bit 7 was 1
+	}
+
+	#[test]
+	fn test_cb_sra_h() {
+		let mut cpu = Cpu::new();
+		let mut inter = create_test_interconnect_with_rom(&[(0x0100, 0x2C)]); // SRA H
+		cpu.reg_pc = 0x0100;
+		cpu.set_reg_h(0x81); // 1000_0001
+
+		let cycles = cpu.execute_opcode(&mut inter, 0xCB);
+
+		assert_eq!(cycles, 8);
+		assert_eq!(cpu.get_reg_h(), 0xC0); // 1100_0000 (shifted right, bit 7 preserved)
+		assert!(cpu.flags.c); // Old bit 0 was 1
+	}
+
+	#[test]
+	fn test_cb_swap_l() {
+		let mut cpu = Cpu::new();
+		let mut inter = create_test_interconnect_with_rom(&[(0x0100, 0x35)]); // SWAP L
+		cpu.reg_pc = 0x0100;
+		cpu.set_reg_l(0x12); // 0001_0010
+
+		let cycles = cpu.execute_opcode(&mut inter, 0xCB);
+
+		assert_eq!(cycles, 8);
+		assert_eq!(cpu.get_reg_l(), 0x21); // 0010_0001 (nibbles swapped)
+		assert!(!cpu.flags.c);
+		assert!(!cpu.flags.z);
+	}
+
+	#[test]
+	fn test_cb_swap_zero() {
+		let mut cpu = Cpu::new();
+		let mut inter = create_test_interconnect_with_rom(&[(0x0100, 0x37)]); // SWAP A
+		cpu.reg_pc = 0x0100;
+		cpu.set_reg_a(0x00);
+
+		cpu.execute_opcode(&mut inter, 0xCB);
+
+		assert_eq!(cpu.get_reg_a(), 0x00);
+		assert!(cpu.flags.z);
+	}
+
+	#[test]
+	fn test_cb_srl_a() {
+		let mut cpu = Cpu::new();
+		let mut inter = create_test_interconnect_with_rom(&[(0x0100, 0x3F)]); // SRL A
+		cpu.reg_pc = 0x0100;
+		cpu.set_reg_a(0x81); // 1000_0001
+
+		let cycles = cpu.execute_opcode(&mut inter, 0xCB);
+
+		assert_eq!(cycles, 8);
+		assert_eq!(cpu.get_reg_a(), 0x40); // 0100_0000 (shifted right, bit 7 = 0)
+		assert!(cpu.flags.c); // Old bit 0 was 1
+	}
+
+	#[test]
+	fn test_cb_bit_0_b() {
+		let mut cpu = Cpu::new();
+		let mut inter = create_test_interconnect_with_rom(&[(0x0100, 0x40)]); // BIT 0,B
+		cpu.reg_pc = 0x0100;
+		cpu.set_reg_b(0xFE); // 1111_1110 (bit 0 is 0)
+		cpu.flags.c = true; // Should be unchanged
+
+		let cycles = cpu.execute_opcode(&mut inter, 0xCB);
+
+		assert_eq!(cycles, 8);
+		assert!(cpu.flags.z); // Bit 0 is 0, so Z is set
+		assert!(!cpu.flags.n);
+		assert!(cpu.flags.h);
+		assert!(cpu.flags.c); // Unchanged
+	}
+
+	#[test]
+	fn test_cb_bit_7_a() {
+		let mut cpu = Cpu::new();
+		let mut inter = create_test_interconnect_with_rom(&[(0x0100, 0x7F)]); // BIT 7,A
+		cpu.reg_pc = 0x0100;
+		cpu.set_reg_a(0x80); // 1000_0000 (bit 7 is 1)
+
+		let cycles = cpu.execute_opcode(&mut inter, 0xCB);
+
+		assert_eq!(cycles, 8);
+		assert!(!cpu.flags.z); // Bit 7 is 1, so Z is clear
+	}
+
+	#[test]
+	fn test_cb_res_3_c() {
+		let mut cpu = Cpu::new();
+		let mut inter = create_test_interconnect_with_rom(&[(0x0100, 0x99)]); // RES 3,C
+		cpu.reg_pc = 0x0100;
+		cpu.set_reg_c(0xFF); // All bits set
+
+		let cycles = cpu.execute_opcode(&mut inter, 0xCB);
+
+		assert_eq!(cycles, 8);
+		assert_eq!(cpu.get_reg_c(), 0xF7); // 1111_0111 (bit 3 cleared)
+	}
+
+	#[test]
+	fn test_cb_set_5_d() {
+		let mut cpu = Cpu::new();
+		let mut inter = create_test_interconnect_with_rom(&[(0x0100, 0xEA)]); // SET 5,D
+		cpu.reg_pc = 0x0100;
+		cpu.set_reg_d(0x00); // All bits clear
+
+		let cycles = cpu.execute_opcode(&mut inter, 0xCB);
+
+		assert_eq!(cycles, 8);
+		assert_eq!(cpu.get_reg_d(), 0x20); // 0010_0000 (bit 5 set)
+	}
+
+	#[test]
+	fn test_cb_rlc_hl_ref() {
+		let mut cpu = Cpu::new();
+		let mut inter = create_test_interconnect_with_rom(&[(0x0100, 0x06)]); // RLC (HL)
+		cpu.reg_pc = 0x0100;
+		cpu.regs_hl.set(0xC000); // Point to WRAM
+		inter.write(0xC000, 0x85); // 1000_0101
+
+		let cycles = cpu.execute_opcode(&mut inter, 0xCB);
+
+		assert_eq!(cycles, 16); // (HL) takes 16 cycles
+		assert_eq!(inter.read(0xC000), 0x0B); // 0000_1011
+		assert!(cpu.flags.c);
+	}
+
+	#[test]
+	fn test_cb_bit_hl_ref() {
+		let mut cpu = Cpu::new();
+		let mut inter = create_test_interconnect_with_rom(&[(0x0100, 0x46)]); // BIT 0,(HL)
+		cpu.reg_pc = 0x0100;
+		cpu.regs_hl.set(0xC000);
+		inter.write(0xC000, 0x01); // Bit 0 is set
+
+		let cycles = cpu.execute_opcode(&mut inter, 0xCB);
+
+		assert_eq!(cycles, 12); // BIT (HL) takes 12 cycles
+		assert!(!cpu.flags.z); // Bit 0 is 1
+	}
+
+	#[test]
+	fn test_cb_set_hl_ref() {
+		let mut cpu = Cpu::new();
+		let mut inter = create_test_interconnect_with_rom(&[(0x0100, 0xFE)]); // SET 7,(HL)
+		cpu.reg_pc = 0x0100;
+		cpu.regs_hl.set(0xC000);
+		inter.write(0xC000, 0x00);
+
+		let cycles = cpu.execute_opcode(&mut inter, 0xCB);
+
+		assert_eq!(cycles, 16);
+		assert_eq!(inter.read(0xC000), 0x80); // Bit 7 set
 	}
 }

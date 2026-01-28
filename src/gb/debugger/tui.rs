@@ -261,10 +261,10 @@ impl<'a> TuiDebugger<'a> {
                 break;
             }
 
-            let halted = gb.step();
+            gb.step();
             steps += 1;
 
-            if halted {
+            if gb.cpu().is_halted() {
                 self.set_status(format!("Halted after {} instructions", steps));
                 break;
             }

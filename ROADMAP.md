@@ -142,51 +142,59 @@ cargo run --release -- rom.gb --dump-mem 0x8000:0x9FFF
 
 ---
 
-## Phase 3: CPU Completion (Critical Path)
+## Phase 3: CPU Completion (Critical Path) ⚡ 95% COMPLETE
 
 **Goal:** Implement all 256+ CPU opcodes
 
-### Priority 1: Most Common Opcodes (~50 opcodes)
-The most frequently used instructions that appear in simple ROMs:
+**Status:** 245+ opcodes implemented. Only CB-prefix extended opcodes remain.
 
-**Load Instructions (LD)**
-- LD r, r' (8-bit register to register) - ~40 variations
-- LD r, n (immediate 8-bit load)
-- LD r, (HL) (load from memory)
-- LD (HL), r (store to memory)
-- LD A, (BC/DE) (load A from BC/DE pointer)
-- LD (BC/DE), A (store A to BC/DE pointer)
-- LD r, (nn) (load from 16-bit address)
-- LD (nn), r (store to 16-bit address)
-- LD rr, nn (16-bit immediate loads)
-- PUSH/POP (stack operations)
+### Implemented ✅
 
-**Arithmetic/Logic**
-- ADD, ADC, SUB, SBC (8-bit arithmetic)
-- AND, OR, XOR (logic operations)
-- INC, DEC (8-bit and 16-bit)
-- CP (compare)
+**Load Instructions (LD)** - All complete
+- LD r, r' (8-bit register to register) - ~40 variations ✅
+- LD r, n (immediate 8-bit load) ✅
+- LD r, (HL) (load from memory) ✅
+- LD (HL), r (store to memory) ✅
+- LD A, (BC/DE) (load A from BC/DE pointer) ✅
+- LD (BC/DE), A (store A to BC/DE pointer) ✅
+- LD r, (nn) (load from 16-bit address) ✅
+- LD (nn), r (store to 16-bit address) ✅
+- LD rr, nn (16-bit immediate loads) ✅
+- PUSH/POP (stack operations) ✅
+- LDH (0xFF00+n) variants ✅
 
-**Control Flow**
-- JP, JR (jumps)
-- CALL, RET (subroutines)
-- Conditional jumps/calls (JZ, JNZ, JC, JNC)
-- RST (restart vectors)
+**Arithmetic/Logic** - All complete
+- ADD, ADC, SUB, SBC (8-bit arithmetic) ✅
+- AND, OR, XOR (logic operations) ✅
+- INC, DEC (8-bit and 16-bit) ✅
+- CP (compare) ✅
+- ADD HL, rr (16-bit addition) ✅
+- ADD SP, r8 ✅
 
-**Bit Operations**
-- RLCA, RLA, RRCA, RRA (rotates)
-- DAA (decimal adjust)
+**Control Flow** - All complete
+- JP, JR (jumps) ✅
+- CALL, RET (subroutines) ✅
+- Conditional jumps/calls (JZ, JNZ, JC, JNC) ✅
+- RST (restart vectors) ✅
 
-### Priority 2: Extended Instructions (CB prefix)
-- BIT, SET, RES (bit test/set/reset)
-- RLC, RL, RRC, RR (rotates)
-- SLA, SRA, SRL (shifts)
-- SWAP
+**Bit Operations (non-CB)**
+- RLCA, RLA, RRCA, RRA (rotates) ✅
+- DAA (decimal adjust) ✅
+- CPL, SCF, CCF ✅
 
-### Priority 3: Remaining Opcodes
-- Interrupts (RETI, DI, EI)
-- Special (HALT, STOP)
-- 16-bit arithmetic (ADD HL, ...)
+**Interrupts/Special** - Stubbed
+- EI, DI ✅ (stubbed, no IME logic yet)
+- RETI ✅ (stubbed)
+- HALT, STOP ✅ (return cycles, need proper implementation)
+
+### Remaining ❌ - CB Prefix (~256 opcodes)
+
+- BIT n, r (bit test) - 64 opcodes
+- SET n, r (bit set) - 64 opcodes
+- RES n, r (bit reset) - 64 opcodes
+- RLC, RL, RRC, RR (rotates) - 16 opcodes
+- SLA, SRA, SRL (shifts) - 24 opcodes
+- SWAP - 8 opcodes
 
 **Testing Strategy:**
 - Unit test each opcode individually
@@ -194,53 +202,39 @@ The most frequently used instructions that appear in simple ROMs:
 - Verify cycle counts
 - Run Blargg's CPU test ROMs
 
-**Estimated Effort:** 2-3 weeks
+**Remaining Effort:** 3-5 days (CB-prefix only)
 
 **Key Files to Modify:**
-- `src/gb/cpu.rs` - Add opcode implementations
-- `src/gb/opcode.rs` - Add opcode enum variants
+- `src/gb/cpu.rs` - Add CB-prefix opcode implementations
 
 ---
 
-## Phase 4: Memory Map Completion
+## Phase 4: Memory Map Completion ✅ COMPLETE
 
 **Goal:** Implement full Game Boy memory map
 
-Current state: Only cartridge regions (0x0000-0x7FFF, 0xA000-0xBFFF) implemented
+**Status:** All memory regions implemented and tested.
 
-**Memory Regions to Add:**
+**Memory Regions:**
 
 ```
 0x0000-0x3FFF : ROM Bank 0 (fixed) ✅
 0x4000-0x7FFF : ROM Bank N (switchable) ✅
-0x8000-0x9FFF : VRAM (Video RAM) ❌
+0x8000-0x9FFF : VRAM (Video RAM) ✅
 0xA000-0xBFFF : External RAM ✅
-0xC000-0xDFFF : Work RAM (WRAM) ❌
-0xE000-0xFDFF : Echo RAM (mirror of C000-DDFF) ❌
-0xFE00-0xFE9F : OAM (Sprite Attribute Table) ❌
-0xFEA0-0xFEFF : Unusable ❌
-0xFF00-0xFF7F : I/O Registers ❌
-0xFF80-0xFFFE : High RAM (HRAM) ❌
-0xFFFF        : Interrupt Enable Register ❌
+0xC000-0xDFFF : Work RAM (WRAM) ✅
+0xE000-0xFDFF : Echo RAM (mirror of C000-DDFF) ✅
+0xFE00-0xFE9F : OAM (Sprite Attribute Table) ✅
+0xFEA0-0xFEFF : Unusable (returns 0xFF) ✅
+0xFF00-0xFF3F : I/O Registers (stubbed) ✅
+0xFF40-0xFF4B : PPU Registers (routed to PPU) ✅
+0xFF4C-0xFF7F : I/O Registers (stubbed) ✅
+0xFF80-0xFFFE : High RAM (HRAM) ✅
+0xFFFF        : Interrupt Enable Register ✅
 ```
 
-**Implementation Steps:**
-1. Add WRAM (8KB) - Simple array
-2. Add HRAM (127 bytes) - Simple array
-3. Add OAM (160 bytes) - Will be used by PPU
-4. Add VRAM (8KB) - Will be used by PPU
-5. Implement Echo RAM (just mirror WRAM)
-6. Stub out I/O registers (return 0xFF for now)
-
-**Testing:**
-- Memory read/write tests for each region
-- Verify mirror behavior for Echo RAM
-- Test boundary conditions
-
-**Estimated Effort:** 3-4 days
-
-**Key Files to Modify:**
-- `src/gb/interconnect.rs` - Route memory accesses
+**Key Files:**
+- `src/gb/interconnect.rs` - Complete memory bus implementation
 
 ---
 
@@ -310,61 +304,64 @@ Timers are relatively simple but required for many games.
 
 ---
 
-## Phase 7: PPU (Graphics) - The Big One
+## Phase 7: PPU (Graphics) - The Big One ⚡ 15% COMPLETE (Timing Only)
 
 **Goal:** Implement pixel processing unit for graphics
 
 This is the largest and most complex component. The PPU has 4 modes and runs in parallel with the CPU.
 
-### PPU Modes
-- Mode 0: H-Blank
-- Mode 1: V-Blank
-- Mode 2: OAM Search
-- Mode 3: Pixel Transfer
+**Status:** Timing framework implemented. No actual rendering yet.
+
+### PPU Modes ✅
+- Mode 0: H-Blank ✅
+- Mode 1: V-Blank ✅
+- Mode 2: OAM Search ✅
+- Mode 3: Pixel Transfer ✅
 
 ### Components
 
-**6.1 Basic PPU Structure**
-- Create PPU struct
-- Implement mode switching
-- Track scanline (LY register)
-- Implement LY comparison (LYC)
+**7.1 Basic PPU Structure ✅ COMPLETE**
+- Create PPU struct ✅
+- Implement mode switching ✅
+- Track scanline (LY register) ✅
+- Implement LY comparison (LYC) ✅
+- Track cycles per scanline (456 T-cycles) ✅
 
-**6.2 Background Rendering**
+**7.2 PPU Registers ✅ COMPLETE**
+All LCD control registers implemented:
+- `0xFF40` LCDC - LCD Control ✅
+- `0xFF41` STAT - LCD Status (mode bits, LYC flag) ✅
+- `0xFF42` SCY - Scroll Y ✅
+- `0xFF43` SCX - Scroll X ✅
+- `0xFF44` LY - LCD Y Coordinate ✅
+- `0xFF45` LYC - LY Compare ✅
+- `0xFF47` BGP - BG Palette ✅
+- `0xFF48` OBP0 - OBJ Palette 0 ✅
+- `0xFF49` OBP1 - OBJ Palette 1 ✅
+- `0xFF4A` WY - Window Y ✅
+- `0xFF4B` WX - Window X ✅
+
+**7.3 Background Rendering ❌ NOT STARTED**
 - Parse background tile map (9800-9BFF or 9C00-9FFF)
 - Parse background tile data (8000-8FFF or 8800-97FF)
 - Implement scrolling (SCX, SCY)
 - Render background to framebuffer
 
-**6.3 Window Rendering**
+**7.4 Window Rendering ❌ NOT STARTED**
 - Implement window layer
 - Handle WX, WY registers
 - Window priority over background
 
-**6.4 Sprite (OBJ) Rendering**
+**7.5 Sprite (OBJ) Rendering ❌ NOT STARTED**
 - Parse OAM (sprite attribute table)
 - Implement sprite rendering (8x8 and 8x16)
 - Handle sprite priority and transparency
 - Implement sprite limit (10 per scanline)
 
-**6.5 PPU Registers**
-Implement all LCD control registers:
-- `0xFF40` LCDC - LCD Control
-- `0xFF41` STAT - LCD Status
-- `0xFF42` SCY - Scroll Y
-- `0xFF43` SCX - Scroll X
-- `0xFF44` LY - LCD Y Coordinate
-- `0xFF45` LYC - LY Compare
-- `0xFF47` BGP - BG Palette
-- `0xFF48` OBP0 - OBJ Palette 0
-- `0xFF49` OBP1 - OBJ Palette 1
-- `0xFF4A` WY - Window Y
-- `0xFF4B` WX - Window X
-
-**6.6 Display Output**
+**7.6 Display Output ❌ NOT STARTED**
 - Create framebuffer (160x144)
 - Integrate with a display library (e.g., `minifb`, `pixels`, or SDL2)
-- Implement V-Blank timing
+- Implement V-Blank interrupt generation
 
 **Testing Strategy:**
 1. Start with solid color background
@@ -374,10 +371,12 @@ Implement all LCD control registers:
 5. Test priority and transparency
 6. Run graphical test ROMs (dmg-acid2, etc.)
 
-**Estimated Effort:** 3-4 weeks
+**Remaining Effort:** 2-3 weeks (rendering + display integration)
 
-**New Files:**
-- `src/gb/ppu.rs` - Main PPU implementation
+**Existing Files:**
+- `src/gb/ppu.rs` - PPU timing implementation (needs rendering)
+
+**New Files Needed:**
 - `src/gb/display.rs` - Display/framebuffer interface
 
 **Dependencies to Add:**
@@ -520,48 +519,50 @@ Audio is complex but not required for basic playability.
 
 ## Summary Timeline
 
-| Phase | Component | Estimated Time |
-|-------|-----------|----------------|
-| 1 | Foundation & Testing | 2-3 days ✅ |
-| 2 | Debug & Visualization | 5-7 days (2A-2C ✅, 2D-2E optional) |
-| 3 | CPU Completion | 2-3 weeks |
-| 4 | Memory Map | 3-4 days |
-| 5 | Timer | 2-3 days |
-| 6 | Interrupts | 3-4 days |
-| 7 | PPU (Graphics) | 3-4 weeks |
-| 8 | Input | 2-3 days |
-| 9 | APU (Audio) | 2-3 weeks (optional) |
-| 10 | Advanced Features | 1 week |
-| 11 | Testing & Accuracy | Ongoing |
-| 12 | Polish | Variable |
+| Phase | Component | Status | Remaining Effort |
+|-------|-----------|--------|------------------|
+| 1 | Foundation & Testing | ✅ Complete | - |
+| 2 | Debug & Visualization | ✅ Complete | Optional: logging infrastructure |
+| 3 | CPU Completion | ⚡ 95% | 3-5 days (CB-prefix only) |
+| 4 | Memory Map | ✅ Complete | - |
+| 5 | Timer | ❌ Not started | 2-3 days |
+| 6 | Interrupts | ⚠️ 20% (registers only) | 2-3 days |
+| 7 | PPU (Graphics) | ⚡ 15% (timing only) | 2-3 weeks (rendering) |
+| 8 | Input | ❌ Not started | 2-3 days |
+| 9 | APU (Audio) | ❌ Not started | 2-3 weeks (optional) |
+| 10 | Advanced Features | ❌ Not started | 1 week |
+| 11 | Testing & Accuracy | Ongoing | Ongoing |
+| 12 | Polish | ❌ Not started | Variable |
 
-**Total Estimated Time (without audio):** 11-15 weeks of focused development
+**Current Completion:** ~35%
 
-**Total Estimated Time (with audio):** 13-18 weeks
+**Remaining Time to Playable (without audio):** 4-6 weeks of focused development
 
-**Note:** Phase 2 (Debug & Visualization) is a high-value investment that will save significant debugging time in later phases.
+**Remaining Time with Audio:** 6-9 weeks
 
 ---
 
 ## Quick Wins for Motivation
 
-To see visible progress quickly, consider this alternative order:
+Progress so far and recommended next steps:
 
 1. ✅ **Foundation** (done!)
-2. ✅ **Basic Debug Tools** - State display (Phase 2A done!)
-3. ⚡ **Memory Map** - Quick implementation (Phase 4)
-4. **Common CPU Opcodes** - Just enough to run simple code (with debug tools to verify!)
-5. **Basic PPU** - Get pixels on screen ASAP (background only, no sprites)
-6. **Timer** - Simple and satisfying
-7. **Interrupts** - Unlocks V-Blank
-8. **Full PPU** - Sprites and polish
-9. **Complete CPU** - Fill in remaining opcodes
+2. ✅ **Basic Debug Tools** - Full TUI debugger (done!)
+3. ✅ **Memory Map** - All regions implemented (done!)
+4. ✅ **Common CPU Opcodes** - 245+ opcodes implemented (done!)
+5. ⚡ **CB-prefix Opcodes** - ~256 extended opcodes (NEXT)
+6. ⚡ **Basic PPU Rendering** - Get pixels on screen (timing already done!)
+7. **Timer** - Simple and satisfying
+8. **Interrupts** - Wire up IME and service routines
+9. **Full PPU** - Sprites and window layer
 10. **Input** - Make it playable!
 11. **Audio & Polish**
 
-This approach prioritizes **visible progress** AND **developer efficiency** - you'll have debugging tools from the start and see pixels on screen sooner!
+**Recommended Next Steps (in order of impact):**
 
-**Recommended Next Step:** Start with Phase 2A (Basic State Display) - just 1-2 days of work that will make everything else 10x easier.
+1. **CB-prefix opcodes** (3-5 days) - Many games need these for bit manipulation
+2. **PPU rendering** (1-2 weeks) - Get pixels on screen! Framework is ready.
+3. **Timer + Interrupts** (1 week) - Required for V-Blank and game timing
 
 ---
 
@@ -590,21 +591,36 @@ This approach prioritizes **visible progress** AND **developer efficiency** - yo
 
 ## Current Priority
 
-**Phase 2A-C + 2E(TUI) Complete! ✅** Debug infrastructure is fully in place.
+**Major milestones completed:**
+- ✅ Phase 1: Foundation & Testing
+- ✅ Phase 2: Debug & Visualization (full TUI debugger)
+- ✅ Phase 3: CPU - 95% complete (245+ opcodes)
+- ✅ Phase 4: Memory Map - 100% complete
+- ✅ Phase 7: PPU timing framework
 
-**What's been done:**
-- ✅ `--debug` flag shows CPU state after each instruction
-- ✅ `--verbose` flag for multi-line debug format
-- ✅ `--max-instructions` flag for limiting execution
-- ✅ `--dump-mem` for hex memory dumps with ASCII
-- ✅ `--interactive` for full TUI debugger with ratatui
-- ✅ Breakpoints, stepping, vi keybindings, live state display
+**What's working:**
+- Full TUI debugger with breakpoints, stepping, memory viewer
+- All standard CPU opcodes (load, arithmetic, logic, control flow)
+- Complete memory bus (VRAM, WRAM, HRAM, OAM, I/O stubs)
+- PPU mode transitions and scanline tracking
 
-**Remaining Optional (Phase 2D/2E):**
-- Logging infrastructure (`env_logger` or `tracing`)
-- Save/load state functionality
+**Recommended Next Steps:**
 
-**Recommended Next Step:** Phase 3 (CPU Completion) or Phase 4 (Memory Map) - the TUI debugger is ready to help track down issues!
+1. **CB-prefix opcodes** (3-5 days)
+   - Required by most games for bit manipulation
+   - File: `src/gb/cpu.rs` - add CB opcode handling
 
-**Alternative Path:**
-Phase 4 (Memory Map Completion) is quick and unblocks CPU testing. Currently only cartridge regions work; WRAM, HRAM, VRAM, OAM, and I/O registers still panic.
+2. **PPU Rendering** (1-2 weeks)
+   - Add framebuffer (160x144 pixels)
+   - Implement background tile rendering
+   - Integrate display library (minifb/pixels/SDL2)
+   - File: `src/gb/ppu.rs` + new `src/gb/display.rs`
+
+3. **Timer + Interrupts** (1 week)
+   - Implement DIV, TIMA, TMA, TAC registers
+   - Wire up IME flag in CPU
+   - Add interrupt service routine calling
+   - New file: `src/gb/timer.rs`
+
+**Path to first playable game (Tetris):**
+CB opcodes → PPU rendering → Timer → Interrupts → Input → **Tetris runs!**

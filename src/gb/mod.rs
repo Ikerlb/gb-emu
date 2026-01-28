@@ -8,3 +8,5 @@ pub mod debug;
 pub mod debugger;
 pub mod mbc;
 pub mod ppu;
+pub mod timer;
+pub mod joypad;

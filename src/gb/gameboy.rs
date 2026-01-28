@@ -30,6 +30,10 @@ impl GameBoy {
         &self.interconnect
     }
 
+    pub fn interconnect_mut(&mut self) -> &mut Interconnect {
+        &mut self.interconnect
+    }
+
     pub fn run(&mut self) {
         loop {
             // Check max instructions limit
@@ -42,33 +46,58 @@ impl GameBoy {
                 }
             }
 
+            // Handle interrupts first
+            let int_cycles = self.cpu.handle_interrupts(&mut self.interconnect);
+            if int_cycles > 0 {
+                self.interconnect.step(int_cycles as u32);
+            }
+
             // Get current instruction for debug output before execution
             let pc_before = self.cpu.pc();
             let opcode_byte = self.interconnect.read(pc_before);
             let opcode = Opcode::from_u8(opcode_byte);
 
-            // Execute instruction and get cycle count
-            let cycles = self.cpu.execute_next_opcode(&mut self.interconnect);
-            self.instruction_count += 1;
+            // Execute instruction (unless halted)
+            let cycles = if self.cpu.is_halted() {
+                4 // HALT consumes 4 cycles per iteration
+            } else {
+                let c = self.cpu.execute_next_opcode(&mut self.interconnect);
+                self.instruction_count += 1;
+                c
+            };
 
-            // Step PPU by the same number of cycles
-            self.interconnect.step_ppu(cycles as u32);
+            // Step hardware (PPU + Timer)
+            self.interconnect.step(cycles as u32);
 
-            // Debug output (only if enabled)
-            if self.debug_config.enabled {
+            // Debug output (only if enabled and not halted)
+            if self.debug_config.enabled && !self.cpu.is_halted() {
                 self.print_debug_state(pc_before, opcode_byte, opcode.as_ref());
             }
         }
     }
 
-    /// Execute a single instruction. Returns true if CPU is halted.
-    pub fn step(&mut self) -> bool {
-        let cycles = self.cpu.execute_next_opcode(&mut self.interconnect);
-        self.instruction_count += 1;
-        // Step PPU by the same number of cycles
-        self.interconnect.step_ppu(cycles as u32);
-        // TODO: Return actual halt state when HALT opcode is implemented
-        false
+    /// Execute a single step. Returns the number of cycles executed.
+    pub fn step(&mut self) -> usize {
+        // Handle interrupts first
+        let int_cycles = self.cpu.handle_interrupts(&mut self.interconnect);
+        if int_cycles > 0 {
+            self.interconnect.step(int_cycles as u32);
+            return int_cycles;
+        }
+
+        // Execute instruction (unless halted)
+        let cycles = if self.cpu.is_halted() {
+            4 // HALT consumes 4 cycles per iteration
+        } else {
+            let c = self.cpu.execute_next_opcode(&mut self.interconnect);
+            self.instruction_count += 1;
+            c
+        };
+
+        // Step hardware (PPU + Timer)
+        self.interconnect.step(cycles as u32);
+
+        cycles
     }
 
     fn print_debug_state(&self, pc: u16, opcode_byte: u8, opcode: Option<&Opcode>) {
