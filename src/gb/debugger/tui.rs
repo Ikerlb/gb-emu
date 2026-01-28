@@ -361,7 +361,7 @@ impl<'a> TuiDebugger<'a> {
         true
     }
 
-    fn handle_mouse(&mut self, event: MouseEvent, gb: &GameBoy) {
+    fn handle_mouse(&mut self, event: MouseEvent, _gb: &GameBoy) {
         match event.kind {
             MouseEventKind::ScrollUp => {
                 if self.focus == Focus::Memory {

@@ -211,21 +211,25 @@ Flags:
 		)
 	}
 
-	//set zero flag
-	fn set_zero_flag(&mut self,bit: bool){
-		self.flags.z=bit;
+	// Flag setters (used in tests)
+	#[allow(dead_code)]
+	fn set_zero_flag(&mut self, bit: bool) {
+		self.flags.z = bit;
 	}
-	//set subtract flag
-	fn set_subtract_flag(&mut self,bit: bool){
-		self.flags.n=bit;
+
+	#[allow(dead_code)]
+	fn set_subtract_flag(&mut self, bit: bool) {
+		self.flags.n = bit;
 	}
-	//set half carry flag
-	fn set_half_carry_flag(&mut self,bit: bool){
-		self.flags.h=bit;
+
+	#[allow(dead_code)]
+	fn set_half_carry_flag(&mut self, bit: bool) {
+		self.flags.h = bit;
 	}
-	//set carry flag
-	fn set_carry_flag(&mut self,bit: bool){
-		self.flags.c=bit;
+
+	#[allow(dead_code)]
+	fn set_carry_flag(&mut self, bit: bool) {
+		self.flags.c = bit;
 	}
 
 	//set regs
@@ -341,7 +345,14 @@ Flags:
 			Reg16Stack::BC => self.regs_bc.get(),
 			Reg16Stack::DE => self.regs_de.get(),
 			Reg16Stack::HL => self.regs_hl.get(),
-			Reg16Stack::AF => self.regs_af.get(),
+			Reg16Stack::AF => {
+				// Build AF from A register and flags
+				let f = ((self.flags.z as u8) << 7)
+					| ((self.flags.n as u8) << 6)
+					| ((self.flags.h as u8) << 5)
+					| ((self.flags.c as u8) << 4);
+				((self.get_reg_a() as u16) << 8) | (f as u16)
+			}
 		}
 	}
 
@@ -351,8 +362,16 @@ Flags:
 			Reg16Stack::BC => self.regs_bc.set(val),
 			Reg16Stack::DE => self.regs_de.set(val),
 			Reg16Stack::HL => self.regs_hl.set(val),
-			// Lower 4 bits of F are always 0
-			Reg16Stack::AF => self.regs_af.set(val & 0xFFF0),
+			Reg16Stack::AF => {
+				// Lower 4 bits of F are always 0
+				self.regs_af.set(val & 0xFFF0);
+				// Update flags from F register
+				let f = val as u8;
+				self.flags.z = f & 0x80 != 0;
+				self.flags.n = f & 0x40 != 0;
+				self.flags.h = f & 0x20 != 0;
+				self.flags.c = f & 0x10 != 0;
+			}
 		}
 	}
 
@@ -708,6 +727,7 @@ Flags:
 	}
 
 	/// Get IME status
+	#[allow(dead_code)] // Useful for debugging
 	pub fn ime(&self) -> bool {
 		self.ime
 	}
@@ -805,17 +825,22 @@ Flags:
 		match value {
 			// ===== 0x0X =====
 			Opcode::Nop => 4,
-			Opcode::Ld_Bc_d16 => {
+			// LD rr, d16 - consolidated using Reg16
+			Opcode::Ld_Bc_d16 | Opcode::Ld_De_d16 | Opcode::Ld_Hl_d16 | Opcode::Ld_Sp_d16 => {
+				let reg = Reg16::from_bits((opcode >> 4) & 0x03);
 				let val = self.read_imm16(inter);
-				self.regs_bc.set(val);
+				self.write_r16(reg, val);
 				12
 			}
 			Opcode::Ld_BCref_A => {
 				inter.write(self.regs_bc.get(), self.get_reg_a());
 				8
 			}
-			Opcode::Inc_Bc => {
-				self.regs_bc.set(self.regs_bc.get().wrapping_add(1));
+			// INC rr - consolidated using Reg16
+			Opcode::Inc_Bc | Opcode::Inc_De | Opcode::Inc_Hl | Opcode::Inc_Sp => {
+				let reg = Reg16::from_bits((opcode >> 4) & 0x03);
+				let val = self.read_r16(reg).wrapping_add(1);
+				self.write_r16(reg, val);
 				8
 			}
 			Opcode::Inc_B => {
@@ -849,8 +874,10 @@ Flags:
 				inter.write_16bits(addr, self.reg_sp);
 				20
 			}
-			Opcode::Add_Hl_Bc => {
-				self.alu_add_hl(self.regs_bc.get());
+			// ADD HL, rr - consolidated using Reg16
+			Opcode::Add_Hl_Bc | Opcode::Add_Hl_De | Opcode::Add_Hl_Hl | Opcode::Add_Hl_Sp => {
+				let reg = Reg16::from_bits((opcode >> 4) & 0x03);
+				self.alu_add_hl(self.read_r16(reg));
 				8
 			}
 			Opcode::Ld_A_BCref => {
@@ -858,8 +885,11 @@ Flags:
 				self.set_reg_a(val);
 				8
 			}
-			Opcode::Dec_Bc => {
-				self.regs_bc.set(self.regs_bc.get().wrapping_sub(1));
+			// DEC rr - consolidated using Reg16
+			Opcode::Dec_Bc | Opcode::Dec_De | Opcode::Dec_Hl | Opcode::Dec_Sp => {
+				let reg = Reg16::from_bits((opcode >> 4) & 0x03);
+				let val = self.read_r16(reg).wrapping_sub(1);
+				self.write_r16(reg, val);
 				8
 			}
 			Opcode::Inc_C => {
@@ -891,17 +921,8 @@ Flags:
 
 			// ===== 0x1X =====
 			Opcode::Stop => 4, // TODO: Proper STOP implementation
-			Opcode::Ld_De_d16 => {
-				let val = self.read_imm16(inter);
-				self.regs_de.set(val);
-				12
-			}
 			Opcode::Ld_DEref_A => {
 				inter.write(self.regs_de.get(), self.get_reg_a());
-				8
-			}
-			Opcode::Inc_De => {
-				self.regs_de.set(self.regs_de.get().wrapping_add(1));
 				8
 			}
 			Opcode::Inc_D => {
@@ -936,17 +957,9 @@ Flags:
 				self.reg_pc = self.reg_pc.wrapping_add(offset as u16);
 				12
 			}
-			Opcode::Add_Hl_De => {
-				self.alu_add_hl(self.regs_de.get());
-				8
-			}
 			Opcode::Ld_A_DEref => {
 				let val = inter.read(self.regs_de.get());
 				self.set_reg_a(val);
-				8
-			}
-			Opcode::Dec_De => {
-				self.regs_de.set(self.regs_de.get().wrapping_sub(1));
 				8
 			}
 			Opcode::Inc_E => {
@@ -978,26 +991,19 @@ Flags:
 			}
 
 			// ===== 0x2X =====
-			Opcode::Jr_Nz_r8 => {
+			// JR cc, r8 - consolidated using Condition
+			Opcode::Jr_Nz_r8 | Opcode::Jr_Z_r8 | Opcode::Jr_Nc_r8 | Opcode::Jr_C_r8 => {
+				let cond = Condition::from_bits((opcode >> 3) & 0x03);
 				let offset = self.read_imm8(inter) as i8;
-				if !self.flags.z {
+				if self.check_condition(cond) {
 					self.reg_pc = self.reg_pc.wrapping_add(offset as u16);
 					12
 				} else {
 					8
 				}
 			}
-			Opcode::Ld_Hl_d16 => {
-				let val = self.read_imm16(inter);
-				self.regs_hl.set(val);
-				12
-			}
 			Opcode::Ld_HLIref_A => {
 				inter.write(self.regs_hl.get(), self.get_reg_a());
-				self.regs_hl.set(self.regs_hl.get().wrapping_add(1));
-				8
-			}
-			Opcode::Inc_Hl => {
 				self.regs_hl.set(self.regs_hl.get().wrapping_add(1));
 				8
 			}
@@ -1042,27 +1048,10 @@ Flags:
 				self.set_reg_a(a);
 				4
 			}
-			Opcode::Jr_Z_r8 => {
-				let offset = self.read_imm8(inter) as i8;
-				if self.flags.z {
-					self.reg_pc = self.reg_pc.wrapping_add(offset as u16);
-					12
-				} else {
-					8
-				}
-			}
-			Opcode::Add_Hl_Hl => {
-				self.alu_add_hl(self.regs_hl.get());
-				8
-			}
 			Opcode::Ld_A_HLIref => {
 				let val = inter.read(self.regs_hl.get());
 				self.set_reg_a(val);
 				self.regs_hl.set(self.regs_hl.get().wrapping_add(1));
-				8
-			}
-			Opcode::Dec_Hl => {
-				self.regs_hl.set(self.regs_hl.get().wrapping_sub(1));
 				8
 			}
 			Opcode::Inc_L => {
@@ -1088,27 +1077,9 @@ Flags:
 			}
 
 			// ===== 0x3X =====
-			Opcode::Jr_Nc_r8 => {
-				let offset = self.read_imm8(inter) as i8;
-				if !self.flags.c {
-					self.reg_pc = self.reg_pc.wrapping_add(offset as u16);
-					12
-				} else {
-					8
-				}
-			}
-			Opcode::Ld_Sp_d16 => {
-				let val = self.read_imm16(inter);
-				self.reg_sp = val;
-				12
-			}
 			Opcode::Ld_HLDref_A => {
 				inter.write(self.regs_hl.get(), self.get_reg_a());
 				self.regs_hl.set(self.regs_hl.get().wrapping_sub(1));
-				8
-			}
-			Opcode::Inc_Sp => {
-				self.reg_sp = self.reg_sp.wrapping_add(1);
 				8
 			}
 			Opcode::Inc_HLref => {
@@ -1134,27 +1105,10 @@ Flags:
 				self.flags.c = true;
 				4
 			}
-			Opcode::Jr_C_r8 => {
-				let offset = self.read_imm8(inter) as i8;
-				if self.flags.c {
-					self.reg_pc = self.reg_pc.wrapping_add(offset as u16);
-					12
-				} else {
-					8
-				}
-			}
-			Opcode::Add_Hl_Sp => {
-				self.alu_add_hl(self.reg_sp);
-				8
-			}
 			Opcode::Ld_A_HLDref => {
 				let val = inter.read(self.regs_hl.get());
 				self.set_reg_a(val);
 				self.regs_hl.set(self.regs_hl.get().wrapping_sub(1));
-				8
-			}
-			Opcode::Dec_Sp => {
-				self.reg_sp = self.reg_sp.wrapping_sub(1);
 				8
 			}
 			Opcode::Inc_A => {
@@ -1327,22 +1281,28 @@ Flags:
 			Opcode::Cp_A_A => { self.alu_cp(self.get_reg_a()); 4 }
 
 			// ===== 0xCX - Control flow, stack, immediate ALU =====
-			Opcode::Ret_Nz => {
-				if !self.flags.z {
+			// RET cc - consolidated using Condition
+			Opcode::Ret_Nz | Opcode::Ret_Z | Opcode::Ret_Nc | Opcode::Ret_C => {
+				let cond = Condition::from_bits((opcode >> 3) & 0x03);
+				if self.check_condition(cond) {
 					self.reg_pc = self.pop_16(inter);
 					20
 				} else {
 					8
 				}
 			}
-			Opcode::Pop_Bc => {
+			// POP rr - consolidated using Reg16Stack
+			Opcode::Pop_Bc | Opcode::Pop_De | Opcode::Pop_Hl | Opcode::Pop_Af => {
+				let reg = Reg16Stack::from_bits((opcode >> 4) & 0x03);
 				let val = self.pop_16(inter);
-				self.regs_bc.set(val);
+				self.write_r16_stack(reg, val);
 				12
 			}
-			Opcode::Jp_Nz_a16 => {
+			// JP cc, a16 - consolidated using Condition
+			Opcode::Jp_Nz_a16 | Opcode::Jp_Z_a16 | Opcode::Jp_Nc_a16 | Opcode::Jp_C_a16 => {
+				let cond = Condition::from_bits((opcode >> 3) & 0x03);
 				let addr = self.read_imm16(inter);
-				if !self.flags.z {
+				if self.check_condition(cond) {
 					self.reg_pc = addr;
 					16
 				} else {
@@ -1353,9 +1313,11 @@ Flags:
 				self.reg_pc = self.read_imm16(inter);
 				16
 			}
-			Opcode::Call_Nz_a16 => {
+			// CALL cc, a16 - consolidated using Condition
+			Opcode::Call_Nz_a16 | Opcode::Call_Z_a16 | Opcode::Call_Nc_a16 | Opcode::Call_C_a16 => {
+				let cond = Condition::from_bits((opcode >> 3) & 0x03);
 				let addr = self.read_imm16(inter);
-				if !self.flags.z {
+				if self.check_condition(cond) {
 					self.push_16(inter, self.reg_pc);
 					self.reg_pc = addr;
 					24
@@ -1363,8 +1325,10 @@ Flags:
 					12
 				}
 			}
-			Opcode::Push_Bc => {
-				self.push_16(inter, self.regs_bc.get());
+			// PUSH rr - consolidated using Reg16Stack
+			Opcode::Push_Bc | Opcode::Push_De | Opcode::Push_Hl | Opcode::Push_Af => {
+				let reg = Reg16Stack::from_bits((opcode >> 4) & 0x03);
+				self.push_16(inter, self.read_r16_stack(reg));
 				16
 			}
 			Opcode::Add_A_d8 => {
@@ -1377,39 +1341,12 @@ Flags:
 				self.reg_pc = 0x0000;
 				16
 			}
-			Opcode::Ret_Z => {
-				if self.flags.z {
-					self.reg_pc = self.pop_16(inter);
-					20
-				} else {
-					8
-				}
-			}
 			Opcode::Ret => {
 				self.reg_pc = self.pop_16(inter);
 				16
 			}
-			Opcode::Jp_Z_a16 => {
-				let addr = self.read_imm16(inter);
-				if self.flags.z {
-					self.reg_pc = addr;
-					16
-				} else {
-					12
-				}
-			}
 			Opcode::Prefix_Cb => {
 				self.execute_cb(inter)
-			}
-			Opcode::Call_Z_a16 => {
-				let addr = self.read_imm16(inter);
-				if self.flags.z {
-					self.push_16(inter, self.reg_pc);
-					self.reg_pc = addr;
-					24
-				} else {
-					12
-				}
 			}
 			Opcode::Call_a16 => {
 				let addr = self.read_imm16(inter);
@@ -1429,42 +1366,6 @@ Flags:
 			}
 
 			// ===== 0xDX - More control flow =====
-			Opcode::Ret_Nc => {
-				if !self.flags.c {
-					self.reg_pc = self.pop_16(inter);
-					20
-				} else {
-					8
-				}
-			}
-			Opcode::Pop_De => {
-				let val = self.pop_16(inter);
-				self.regs_de.set(val);
-				12
-			}
-			Opcode::Jp_Nc_a16 => {
-				let addr = self.read_imm16(inter);
-				if !self.flags.c {
-					self.reg_pc = addr;
-					16
-				} else {
-					12
-				}
-			}
-			Opcode::Call_Nc_a16 => {
-				let addr = self.read_imm16(inter);
-				if !self.flags.c {
-					self.push_16(inter, self.reg_pc);
-					self.reg_pc = addr;
-					24
-				} else {
-					12
-				}
-			}
-			Opcode::Push_De => {
-				self.push_16(inter, self.regs_de.get());
-				16
-			}
 			Opcode::Sub_A_d8 => {
 				let val = self.read_imm8(inter);
 				self.alu_sub(val);
@@ -1475,37 +1376,10 @@ Flags:
 				self.reg_pc = 0x0010;
 				16
 			}
-			Opcode::Ret_C => {
-				if self.flags.c {
-					self.reg_pc = self.pop_16(inter);
-					20
-				} else {
-					8
-				}
-			}
 			Opcode::Reti => {
 				self.ime = true; // Enable interrupts immediately
 				self.reg_pc = self.pop_16(inter);
 				16
-			}
-			Opcode::Jp_C_a16 => {
-				let addr = self.read_imm16(inter);
-				if self.flags.c {
-					self.reg_pc = addr;
-					16
-				} else {
-					12
-				}
-			}
-			Opcode::Call_C_a16 => {
-				let addr = self.read_imm16(inter);
-				if self.flags.c {
-					self.push_16(inter, self.reg_pc);
-					self.reg_pc = addr;
-					24
-				} else {
-					12
-				}
 			}
 			Opcode::Sbc_A_d8 => {
 				let val = self.read_imm8(inter);
@@ -1524,18 +1398,9 @@ Flags:
 				inter.write(0xFF00 + offset, self.get_reg_a());
 				12
 			}
-			Opcode::Pop_Hl => {
-				let val = self.pop_16(inter);
-				self.regs_hl.set(val);
-				12
-			}
 			Opcode::Ld_Cref_A => {
 				inter.write(0xFF00 + self.get_reg_c() as u16, self.get_reg_a());
 				8
-			}
-			Opcode::Push_Hl => {
-				self.push_16(inter, self.regs_hl.get());
-				16
 			}
 			Opcode::And_A_d8 => {
 				let val = self.read_imm8(inter);
@@ -1583,18 +1448,6 @@ Flags:
 				self.set_reg_a(inter.read(0xFF00 + offset));
 				12
 			}
-			Opcode::Pop_Af => {
-				let val = self.pop_16(inter);
-				// Lower 4 bits of F are always 0
-				self.regs_af.set(val & 0xFFF0);
-				// Update flags from F register
-				let f = val as u8;
-				self.flags.z = f & 0x80 != 0;
-				self.flags.n = f & 0x40 != 0;
-				self.flags.h = f & 0x20 != 0;
-				self.flags.c = f & 0x10 != 0;
-				12
-			}
 			Opcode::Ld_A_Cref => {
 				self.set_reg_a(inter.read(0xFF00 + self.get_reg_c() as u16));
 				8
@@ -1603,16 +1456,6 @@ Flags:
 				self.ime = false;
 				self.ime_pending = false;
 				4
-			}
-			Opcode::Push_Af => {
-				// Build F from flags
-				let f = ((self.flags.z as u8) << 7)
-					| ((self.flags.n as u8) << 6)
-					| ((self.flags.h as u8) << 5)
-					| ((self.flags.c as u8) << 4);
-				let af = ((self.get_reg_a() as u16) << 8) | (f as u16);
-				self.push_16(inter, af);
-				16
 			}
 			Opcode::Or_A_d8 => {
 				let val = self.read_imm8(inter);

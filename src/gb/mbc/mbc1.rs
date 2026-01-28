@@ -190,7 +190,7 @@ mod tests {
 
     #[test]
     fn ram_disabled_by_default() {
-        let mut mbc = make_mbc1(0x8000, 0x2000);
+        let mbc = make_mbc1(0x8000, 0x2000);
 
         assert_eq!(mbc.read(0xA000), 0xFF);
     }

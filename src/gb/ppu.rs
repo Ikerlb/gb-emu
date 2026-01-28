@@ -449,16 +449,19 @@ impl Ppu {
     }
 
     /// Get current scanline (LY)
+    #[allow(dead_code)] // Used in tests
     pub fn ly(&self) -> u8 {
         self.ly
     }
 
     /// Get current mode
+    #[allow(dead_code)] // Used in tests
     pub fn mode(&self) -> Mode {
         self.mode
     }
 
     /// Check if in VBLANK period
+    #[allow(dead_code)] // Used in tests
     pub fn in_vblank(&self) -> bool {
         self.mode == Mode::VBlank
     }

@@ -100,6 +100,7 @@ impl Joypad {
     }
 
     /// Check if any button is currently pressed (for interrupt)
+    #[allow(dead_code)] // May be used for joypad interrupt support
     pub fn any_pressed(&self) -> bool {
         self.direction_buttons != 0x0F || self.action_buttons != 0x0F
     }

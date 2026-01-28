@@ -7,6 +7,7 @@ pub trait Memory {
 }
 
 /// Persistence - for battery-backed cartridges
+#[allow(dead_code)] // Infrastructure for future save file support
 pub trait Stable {
     /// Returns data to save to a .sav file
     fn save_data(&self) -> Vec<u8>;

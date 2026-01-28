@@ -5,9 +5,12 @@ use crate::gb::joypad::{Joypad, Button};
 
 /// Interrupt flag bits
 pub const INT_VBLANK: u8 = 0x01;  // Bit 0: V-Blank
+#[allow(dead_code)]
 pub const INT_STAT: u8 = 0x02;    // Bit 1: LCD STAT
 pub const INT_TIMER: u8 = 0x04;   // Bit 2: Timer
+#[allow(dead_code)]
 pub const INT_SERIAL: u8 = 0x08;  // Bit 3: Serial
+#[allow(dead_code)]
 pub const INT_JOYPAD: u8 = 0x10;  // Bit 4: Joypad
 
 pub struct Interconnect {
@@ -62,6 +65,7 @@ impl Interconnect {
     }
 
     /// Legacy method - calls step()
+    #[allow(dead_code)]
     pub fn step_ppu(&mut self, cycles: u32) {
         self.step(cycles);
     }
@@ -77,16 +81,19 @@ impl Interconnect {
     }
 
     /// Request an interrupt
+    #[allow(dead_code)]
     pub fn request_interrupt(&mut self, interrupt: u8) {
         self.if_register |= interrupt;
     }
 
     /// Get IE register
+    #[allow(dead_code)]
     pub fn ie(&self) -> u8 {
         self.ie_register
     }
 
     /// Get IF register
+    #[allow(dead_code)]
     pub fn if_reg(&self) -> u8 {
         self.if_register | 0xE0 // Upper 3 bits always read as 1
     }
@@ -165,6 +172,7 @@ impl Interconnect {
     }
 
     /// Reads 16 bits from the given address (little-endian: low byte first)
+    #[allow(dead_code)] // Used in tests
     pub fn read_16bits(&self, address: u16) -> u16 {
         let lo = self.read(address) as u16;
         let hi = self.read(address.wrapping_add(1)) as u16;
@@ -237,7 +245,7 @@ mod tests {
     #[test]
     fn test_interconnect_creation() {
         let rom = create_test_rom();
-        let inter = Interconnect::new(rom);
+        let _inter = Interconnect::new(rom);
         // Should not panic
     }
 

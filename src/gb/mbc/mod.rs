@@ -16,7 +16,9 @@ use mbc1::Mbc1;
 /// Unified cartridge interface
 pub struct Cartridge {
     mbc: Box<dyn Mbc>,
+    #[allow(dead_code)] // Used in tests
     title: String,
+    #[allow(dead_code)] // Used in tests
     has_battery: bool,
 }
 
@@ -44,18 +46,22 @@ impl Cartridge {
         self.mbc.write(addr, val);
     }
 
+    #[allow(dead_code)] // Used in tests
     pub fn title(&self) -> &str {
         &self.title
     }
 
+    #[allow(dead_code)] // Used in tests
     pub fn has_battery(&self) -> bool {
         self.has_battery
     }
 
+    #[allow(dead_code)] // Infrastructure for future save file support
     pub fn save_data(&self) -> Vec<u8> {
         self.mbc.save_data()
     }
 
+    #[allow(dead_code)] // Infrastructure for future save file support
     pub fn load_data(&mut self, data: &[u8]) {
         self.mbc.load_data(data);
     }
